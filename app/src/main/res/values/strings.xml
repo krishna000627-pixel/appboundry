@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AppBoundary</string>
+    <string name="tile_label">App Boundary</string>
+    <string name="alert_title">App Not Supported</string>
+    <!-- Customize this message freely. %1$s is replaced with the target app name. -->
+    <string name="alert_message">%1$s is no longer compatible with your device architecture or system version.</string>
+    <string name="alert_ok">OK</string>
+    <string name="fallback_app_name">This app</string>
+    <string name="service_description">Detects when a restricted app is opened and shows a focus alert. Enable it in Accessibility settings, then toggle it from Quick Settings.</string>
+</resources>
