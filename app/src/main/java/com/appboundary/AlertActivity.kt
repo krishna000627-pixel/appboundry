@@ -1,13 +1,15 @@
 package com.appboundary
 
 import android.accessibilityservice.AccessibilityService
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
-import android.os.CountDownTimer
 import android.os.SystemClock
+import android.view.GestureDetector
+import android.view.MotionEvent
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
@@ -18,28 +20,50 @@ class AlertActivity : Activity() {
 
     private lateinit var tvTitle: TextView
     private lateinit var tvMessage: TextView
-    private lateinit var btnNegative: Button
     private lateinit var btnPositive: Button
+    private lateinit var sequence: String
 
     private var targetPackage: String? = null
     private var label: String = ""
-    private var unlocking = false
     private var progress = 0
     private var lastTapAt = 0L
-    private var timer: CountDownTimer? = null
 
+    @SuppressLint("ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_alert)
 
         tvTitle = findViewById(R.id.tvTitle)
         tvMessage = findViewById(R.id.tvMessage)
-        btnNegative = findViewById(R.id.btnNegative)
         btnPositive = findViewById(R.id.btnPositive)
+        sequence = getString(R.string.unlock_sequence)
 
         tvTitle.setOnClickListener { onSecretTap('T') }
         tvMessage.setOnClickListener { onSecretTap('M') }
-        findViewById<View>(R.id.root).setOnClickListener { progress = 0 }
+        btnPositive.setOnClickListener { goHomeAndFinish() }
+
+        // Last step of the secret: double tap on the black area.
+        val detector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDoubleTap(e: MotionEvent): Boolean {
+                if (isArmed()) {
+                    BoundaryAccessibilityService.grantSession(targetPackage)
+                    finish()
+                } else {
+                    progress = 0
+                }
+                return true
+            }
+
+            override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                progress = 0
+                return true
+            }
+        })
+        findViewById<View>(R.id.root).setOnTouchListener { _, event ->
+            detector.onTouchEvent(event)
+            true
+        }
+
         applyTarget(intent)
     }
 
@@ -51,7 +75,11 @@ class AlertActivity : Activity() {
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) hideSystemBars()
+        if (hasFocus) {
+            hideSystemBars()
+            // This black screen is now visible, so the instant cover is no longer needed.
+            BoundaryAccessibilityService.instance?.hideCover()
+        }
     }
 
     @Suppress("OVERRIDE_DEPRECATION")
@@ -59,70 +87,22 @@ class AlertActivity : Activity() {
         goHomeAndFinish()
     }
 
-    override fun onDestroy() {
-        timer?.cancel()
-        super.onDestroy()
-    }
-
-    // ---- States -------------------------------------------------------------
-
     private fun applyTarget(intent: Intent) {
         targetPackage = intent.getStringExtra(EXTRA_PACKAGE)
         label = resolveLabel(targetPackage)
-        showAlertState()
-    }
-
-    /** Default state: the "app not supported" box with a single OK button. */
-    private fun showAlertState() {
-        timer?.cancel()
-        unlocking = false
         progress = 0
-
         tvTitle.setText(R.string.alert_title)
         tvMessage.text = getString(R.string.alert_message, label)
-        btnNegative.visibility = View.GONE
         btnPositive.setText(R.string.alert_ok)
-        setPositiveEnabled(true)
-        btnPositive.setOnClickListener { goHomeAndFinish() }
     }
 
-    /** Hidden state, reached by tapping the title: wait, then continue until the app is left. */
-    private fun showUnlockState() {
-        unlocking = true
-        progress = 0
-
-        tvTitle.text = getString(R.string.unlock_title, label)
-        tvMessage.text = getString(R.string.unlock_message, label)
-        btnNegative.visibility = View.VISIBLE
-        btnNegative.setText(R.string.unlock_back)
-        btnNegative.setOnClickListener { goHomeAndFinish() }
-
-        setPositiveEnabled(false)
-        btnPositive.setOnClickListener {
-            BoundaryAccessibilityService.grantSession(targetPackage)
-            finish()
-        }
-
-        val seconds = resources.getInteger(R.integer.unlock_delay_seconds)
-        timer?.cancel()
-        timer = object : CountDownTimer(seconds * 1000L, 1000L) {
-            override fun onTick(millisLeft: Long) {
-                btnPositive.text = getString(R.string.unlock_wait, ((millisLeft + 999) / 1000).toInt())
-            }
-
-            override fun onFinish() {
-                btnPositive.setText(R.string.unlock_continue)
-                setPositiveEnabled(true)
-            }
-        }.start()
-    }
-
-    /** Secret sequence of taps on the title (T) and the message (M); a wrong tap restarts it. */
+    /**
+     * Secret: tap message/title in the order given by unlock_sequence (M = message, T = title),
+     * then double tap the black area. A wrong tap restarts it; max 2 s between taps.
+     */
     private fun onSecretTap(symbol: Char) {
-        if (unlocking) return
-        val sequence = getString(R.string.unlock_sequence)
         val now = SystemClock.elapsedRealtime()
-        if (now - lastTapAt > TAP_WINDOW_MS) progress = 0
+        if (now - lastTapAt > TAP_WINDOW_MS || progress >= sequence.length) progress = 0
         lastTapAt = now
 
         progress = when {
@@ -130,15 +110,10 @@ class AlertActivity : Activity() {
             sequence[0] == symbol -> 1
             else -> 0
         }
-        if (progress == sequence.length) showUnlockState()
     }
 
-    // ---- Helpers ------------------------------------------------------------
-
-    private fun setPositiveEnabled(enabled: Boolean) {
-        btnPositive.isEnabled = enabled
-        btnPositive.alpha = if (enabled) 1f else 0.4f
-    }
+    private fun isArmed(): Boolean =
+        progress == sequence.length && SystemClock.elapsedRealtime() - lastTapAt <= TAP_WINDOW_MS
 
     private fun resolveLabel(pkg: String?): String {
         if (pkg == null) return getString(R.string.fallback_app_name)
