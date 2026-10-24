@@ -7,5 +7,13 @@
     <string name="alert_message">%1$s is no longer compatible with your device architecture or system version.</string>
     <string name="alert_ok">OK</string>
     <string name="fallback_app_name">This app</string>
+
+    <!-- Hidden unlock step (secret tap sequence, see config.xml). -->
+    <string name="unlock_title">Continue to %1$s?</string>
+    <string name="unlock_message">%1$s will stay open until you leave it. Next time you will have to repeat this.</string>
+    <string name="unlock_wait">Continue (%1$d)</string>
+    <string name="unlock_continue">Continue</string>
+    <string name="unlock_back">Go back</string>
+
     <string name="service_description">Detects when a restricted app is opened and shows a focus alert. Enable it in Accessibility settings, then toggle it from Quick Settings.</string>
 </resources>

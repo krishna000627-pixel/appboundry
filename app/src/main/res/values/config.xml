@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Secret tap sequence: T = tap the title, M = tap the message. Max 2 s between taps. -->
+    <string name="unlock_sequence" translatable="false">MMTMT</string>
+    <!-- Seconds the user must wait before Continue becomes available. -->
+    <integer name="unlock_delay_seconds">3</integer>
+</resources>
