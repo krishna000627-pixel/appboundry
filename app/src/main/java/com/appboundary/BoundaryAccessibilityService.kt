@@ -48,8 +48,11 @@ class BoundaryAccessibilityService : AccessibilityService() {
 
         if (pkg !in Prefs.targets(this)) return
 
-        // Debounce: one app launch can emit several window-state events.
+        // Never stack a second alert: skip if one is on screen or was just dismissed.
         val now = SystemClock.elapsedRealtime()
+        if (AlertActivity.isShowing || now < cooldownUntil) return
+
+        // Debounce: one app launch can emit several window-state events.
         if (now - lastTriggerAt < DEBOUNCE_MS) return
         lastTriggerAt = now
 
@@ -128,6 +131,7 @@ class BoundaryAccessibilityService : AccessibilityService() {
 
     companion object {
         private const val DEBOUNCE_MS = 1500L
+        private const val COOLDOWN_MS = 1000L
         private const val COVER_TIMEOUT_MS = 2500L
         private const val SYSTEM_UI = "com.android.systemui"
 
@@ -139,8 +143,16 @@ class BoundaryAccessibilityService : AccessibilityService() {
         var unlockedPackage: String? = null
             private set
 
+        @Volatile
+        private var cooldownUntil = 0L
+
         fun grantSession(pkg: String?) {
             unlockedPackage = pkg
+        }
+
+        /** Called when the alert is dismissed with OK/Back: ignore stray events for a moment. */
+        fun markDismissed() {
+            cooldownUntil = SystemClock.elapsedRealtime() + COOLDOWN_MS
         }
     }
 }

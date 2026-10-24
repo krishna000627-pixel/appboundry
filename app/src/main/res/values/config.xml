@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!--
-      Secret unlock: tap the TEXT in this order (M = message text, T = title text), max 2 s
-      between taps, then double tap the black area outside the box.
+      Secret unlock: tap the black area (outside the box) this many times quickly, then press
+      and hold the box. Max 2 s between taps.
     -->
-    <string name="unlock_sequence" translatable="false">MTMTMT</string>
+    <integer name="unlock_taps">3</integer>
 </resources>
