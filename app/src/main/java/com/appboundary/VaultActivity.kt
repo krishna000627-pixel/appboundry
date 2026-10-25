@@ -1232,7 +1232,7 @@ class VaultActivity : Activity() {
         viewerLayer.alpha = 0f
         viewerLayer.visibility = View.VISIBLE
         enterFullScreen()
-        setControls(item.video, false)
+        setControls(true, false)
         pager.open(idx)
         viewerLayer.animate().alpha(1f).setDuration(160).start()
     }
@@ -1310,19 +1310,41 @@ class VaultActivity : Activity() {
     }
 
     /** Controls showing: the picture is reduced to the space between the bars. Hidden: it fills the page. */
+    private var pagerAnim: android.animation.ValueAnimator? = null
+
     private fun fitPager(animate: Boolean, retry: Boolean = true) {
-        // The picture always fills the page; the bars float over it and fade in and out.
-        val scale = 1f
-        val ty = 0f
-        pager.animate().cancel()
-        if (animate) {
-            pager.animate().scaleX(scale).scaleY(scale).translationY(ty).setDuration(180).start()
-        } else {
-            pager.scaleX = scale
-            pager.scaleY = scale
-            pager.translationY = ty
+        var top = 0
+        var bottom = 0
+        if (controlsVisible) {
+            top = viewerTop.height
+            bottom = viewerBottom.height
+            if (top <= 0 || bottom <= 0) {
+                if (retry) viewerLayer.post { fitPager(false, false) }
+                return
+            }
         }
-        btnPlay.translationY = ty
+        btnPlay.translationY = (top - bottom) / 2f
+        val lp = pager.layoutParams as FrameLayout.LayoutParams
+        if (lp.topMargin == top && lp.bottomMargin == bottom) return
+        pagerAnim?.cancel()
+        if (!animate) {
+            lp.topMargin = top
+            lp.bottomMargin = bottom
+            pager.layoutParams = lp
+            return
+        }
+        val t0 = lp.topMargin
+        val b0 = lp.bottomMargin
+        pagerAnim = android.animation.ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 180
+            addUpdateListener {
+                val f = it.animatedValue as Float
+                lp.topMargin = (t0 + (top - t0) * f).toInt()
+                lp.bottomMargin = (b0 + (bottom - b0) * f).toInt()
+                pager.layoutParams = lp
+            }
+            start()
+        }
     }
 
     private fun isPlayingVideo(): Boolean {
@@ -1423,6 +1445,8 @@ class VaultActivity : Activity() {
         pager.scaleY = 1f
         pager.translationY = 0f
         btnPlay.translationY = 0f
+        pagerAnim?.cancel()
+        (pager.layoutParams as FrameLayout.LayoutParams).let { it.topMargin = 0; it.bottomMargin = 0; pager.layoutParams = it }
         exitFullScreen()
     }
 
