@@ -780,6 +780,7 @@ class VaultActivity : Activity() {
             true
         }
         btnHideMedia.setOnClickListener { addDialog() }
+        findViewById<View>(R.id.btnCleanOriginals).setOnClickListener { cleanOriginals() }
         tabAll.setOnClickListener { closeFolder() }
         btnSort.setOnClickListener {
             newestFirst = !newestFirst
@@ -1012,6 +1013,39 @@ class VaultActivity : Activity() {
     }
 
     // -- hiding --
+
+    /** Finds gallery copies of things already hidden and deletes them after a confirmation. */
+    private fun cleanOriginals() {
+        val app = applicationContext
+        Toast.makeText(this, R.string.vault_clean_searching, Toast.LENGTH_SHORT).show()
+        Thread {
+            val found = MediaVault.findLeftovers(app)
+            runOnUiThread {
+                if (isDestroyed) return@runOnUiThread
+                if (found.isEmpty()) {
+                    Toast.makeText(this, R.string.vault_clean_none, Toast.LENGTH_LONG).show()
+                    return@runOnUiThread
+                }
+                AlertDialog.Builder(this, R.style.Vault_Dialog)
+                    .setTitle(R.string.vault_clean_title)
+                    .setMessage(getString(R.string.vault_clean_msg, found.size))
+                    .setNegativeButton(R.string.vault_media_cancel, null)
+                    .setPositiveButton(R.string.vault_media_delete) { _, _ ->
+                        val allFiles = hasAllFiles()
+                        Thread {
+                            val stuck = ArrayList<Uri>()
+                            for (u in found) if (!MediaVault.deleteOriginal(app, u, allFiles)) stuck.add(u)
+                            runOnUiThread {
+                                if (isDestroyed) return@runOnUiThread
+                                Toast.makeText(this, getString(R.string.vault_clean_done, found.size - stuck.size), Toast.LENGTH_LONG).show()
+                                if (stuck.isNotEmpty()) askDeleteOriginals(stuck)
+                            }
+                        }.start()
+                    }
+                    .show()
+            }
+        }.start()
+    }
 
     /** "Add" button: choose between the gallery picker and the file browser; both allow many at once. */
     private fun addDialog() {

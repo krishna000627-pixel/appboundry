@@ -269,15 +269,56 @@ object MediaVault {
         return ContentUris.withAppendedId(base, id)
     }
 
+    /** Gallery files that are still there although the vault holds a copy (same name and same size). */
+    fun findLeftovers(context: Context): List<Uri> {
+        val app = context.applicationContext
+        val cr = app.contentResolver
+        val keys = HashSet<String>()
+        for (item in list(app)) keys.add(item.name + "|" + item.file.length())
+        if (keys.isEmpty()) return emptyList()
+        val out = ArrayList<Uri>()
+        for (base in listOf(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, MediaStore.Video.Media.EXTERNAL_CONTENT_URI)) {
+            try {
+                cr.query(
+                    base,
+                    arrayOf(MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DISPLAY_NAME, MediaStore.MediaColumns.SIZE),
+                    null, null, null
+                )?.use { c ->
+                    while (c.moveToNext()) {
+                        val name = c.getString(1) ?: continue
+                        if ((name + "|" + c.getLong(2)) in keys) out.add(ContentUris.withAppendedId(base, c.getLong(0)))
+                    }
+                }
+            } catch (e: Exception) {
+            }
+        }
+        return out
+    }
+
     fun deleteOriginal(context: Context, uri: Uri, allFiles: Boolean): Boolean {
         val app = context.applicationContext
         val cr = app.contentResolver
         val mediaUri = resolveMediaUri(app, uri)
         if (mediaUri != null) {
-            return try {
-                cr.delete(mediaUri, null, null) > 0
+            try {
+                if (cr.delete(mediaUri, null, null) > 0) return true
             } catch (e: Exception) {
-                false
+            }
+            // The media store said no: with "All files access" remove the real file and tell the gallery.
+            if (allFiles) {
+                try {
+                    var path: String? = null
+                    cr.query(mediaUri, arrayOf(MediaStore.MediaColumns.DATA), null, null, null)?.use { c ->
+                        if (c.moveToFirst()) path = c.getString(0)
+                    }
+                    val f = path?.let { File(it) }
+                    if (f != null && f.exists()) {
+                        val gone = f.delete() || !f.exists()
+                        MediaScannerConnection.scanFile(app, arrayOf(f.absolutePath), null, null)
+                        if (gone) return true
+                    }
+                } catch (e: Exception) {
+                }
             }
         }
         try {

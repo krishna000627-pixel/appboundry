@@ -91,6 +91,12 @@
     <string name="vault_media_hide">Add photos &amp; videos</string>
     <string name="vault_media_hiding">Hiding...</string>
     <string name="vault_media_hiding_n">Hiding %1$d / %2$d</string>
+    <string name="vault_clean_btn">Delete leftover originals</string>
+    <string name="vault_clean_searching">Looking for leftovers...</string>
+    <string name="vault_clean_none">No leftover originals found.</string>
+    <string name="vault_clean_title">Delete originals?</string>
+    <string name="vault_clean_msg">%1$d photos/videos are still in your gallery although a copy is hidden here. Delete them from the gallery?</string>
+    <string name="vault_clean_done">Deleted %1$d</string>
     <string name="vault_add_title">Add to vault</string>
     <string name="vault_add_gallery">Photos &amp; videos (gallery)</string>
     <string name="vault_add_files">Browse files</string>
