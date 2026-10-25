@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!--
-      Secret unlock: tap the black area (outside the box) this many times quickly, then press
-      and hold the box. Max 2 s between taps.
-    -->
-    <integer name="unlock_taps">3</integer>
-</resources>
