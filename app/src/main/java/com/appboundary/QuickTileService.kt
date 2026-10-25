@@ -1,5 +1,6 @@
 package com.appboundary
 
+import android.graphics.drawable.Icon
 import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
@@ -25,7 +26,8 @@ class QuickTileService : TileService() {
         val tile = qsTile ?: return
         val on = Prefs.isEnabled(this)
         tile.state = if (on) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
-        tile.label = getString(R.string.tile_label)
+        tile.icon = Icon.createWithResource(this, Prefs.tileIconRes(this))
+        tile.label = Prefs.tileName(this) ?: getString(R.string.tile_label)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             tile.subtitle = getString(if (on) R.string.tile_on else R.string.tile_off)
         }

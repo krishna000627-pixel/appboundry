@@ -67,6 +67,7 @@ class VaultActivity : Activity() {
         BLOCKED(R.string.vault_nav_blocked),
         ALERT(R.string.vault_nav_alert),
         UNLOCK(R.string.vault_nav_unlock),
+        TILE(R.string.vault_nav_tile),
         SECURITY(R.string.vault_nav_security)
     }
 
@@ -189,6 +190,10 @@ class VaultActivity : Activity() {
     // Alert text
     private lateinit var etTitle: EditText
     private lateinit var etMessage: EditText
+    private lateinit var etTileName: EditText
+    private lateinit var tvTilePreview: TextView
+    private lateinit var ivTilePreview: ImageView
+    private lateinit var llTileIcons: LinearLayout
 
     // Unlock methods
     private lateinit var swTapHold: Switch
@@ -358,6 +363,7 @@ class VaultActivity : Activity() {
             Page.BLOCKED to findViewById<View>(R.id.pageBlocked),
             Page.ALERT to findViewById<View>(R.id.pageAlert),
             Page.UNLOCK to findViewById<View>(R.id.pageUnlock),
+            Page.TILE to findViewById<View>(R.id.pageTile),
             Page.SECURITY to findViewById<View>(R.id.pageSecurity)
         )
         navItems = mapOf(
@@ -366,6 +372,7 @@ class VaultActivity : Activity() {
             Page.BLOCKED to findViewById<TextView>(R.id.navBlocked),
             Page.ALERT to findViewById<TextView>(R.id.navAlert),
             Page.UNLOCK to findViewById<TextView>(R.id.navUnlock),
+            Page.TILE to findViewById<TextView>(R.id.navTile),
             Page.SECURITY to findViewById<TextView>(R.id.navSecurity)
         )
 
@@ -421,6 +428,10 @@ class VaultActivity : Activity() {
 
         etTitle = findViewById(R.id.etTitle)
         etMessage = findViewById(R.id.etMessage)
+        etTileName = findViewById(R.id.etTileName)
+        tvTilePreview = findViewById(R.id.tvTilePreview)
+        ivTilePreview = findViewById(R.id.ivTilePreview)
+        llTileIcons = findViewById(R.id.llTileIcons)
 
         swTapHold = findViewById(R.id.swTapHold)
         swVolume = findViewById(R.id.swVolume)
@@ -1849,6 +1860,7 @@ class VaultActivity : Activity() {
         vaultRoot.alpha = 0f
         vaultRoot.animate().alpha(1f).setDuration(220).start()
         loadAlertTexts()
+        loadTileName()
         showPage(Page.HOME)
         // Warm the app-name cache in the background so the picker opens instantly.
         AppCache.sync(this) { }
@@ -1932,6 +1944,19 @@ class VaultActivity : Activity() {
 
         // Blocked apps
         findViewById<View>(R.id.btnAddApp).setOnClickListener { openPicker() }
+
+        // Quick tile name
+        etTileName.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) {}
+            override fun onTextChanged(s: CharSequence?, st: Int, b: Int, c: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) = renderTilePreview()
+        })
+        findViewById<View>(R.id.btnTileSave).setOnClickListener { saveTileName(true) }
+        findViewById<View>(R.id.btnTileReset).setOnClickListener {
+            Prefs.setTileName(this, null)
+            loadTileName()
+            refreshTile()
+        }
 
         // Alert text
         findViewById<View>(R.id.btnSave).setOnClickListener { saveTexts(true) }
@@ -2101,6 +2126,80 @@ class VaultActivity : Activity() {
                 else -> "\u2198"
             }
         }.joinToString("  ")
+
+    // ---- Quick tile name ----------------------------------------------------
+
+    private fun loadTileName() {
+        etTileName.hint = getString(R.string.tile_label)
+        etTileName.setText(Prefs.tileName(this) ?: "")
+        renderTilePreview()
+        buildTileIcons()
+    }
+
+    private fun renderTilePreview() {
+        val typed = etTileName.text.toString().trim()
+        tvTilePreview.text = if (typed.isEmpty()) getString(R.string.tile_label) else typed
+        ivTilePreview.setImageResource(Prefs.tileIconRes(this))
+    }
+
+    /** Grid of tile icons, two rows of four. Tapping one saves it and updates the tile. */
+    private fun buildTileIcons() {
+        llTileIcons.removeAllViews()
+        val current = Prefs.tileIcon(this)
+        val gap = dp(8)
+        var row: LinearLayout? = null
+        Prefs.TILE_ICONS.forEachIndexed { i, res ->
+            if (i % 4 == 0) {
+                val newRow = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).also { it.topMargin = if (i == 0) 0 else gap }
+                }
+                llTileIcons.addView(newRow)
+                row = newRow
+            }
+            val selected = i == current
+            val cell = ImageView(this).apply {
+                setImageResource(res)
+                scaleType = ImageView.ScaleType.CENTER_INSIDE
+                setPadding(dp(14), dp(14), dp(14), dp(14))
+                setBackgroundResource(if (selected) R.drawable.bg_btn_primary else R.drawable.bg_btn_tonal)
+                imageTintList = android.content.res.ColorStateList.valueOf(
+                    getColor(if (selected) R.color.vault_on_accent else R.color.vault_text)
+                )
+                contentDescription = getString(Prefs.TILE_ICON_NAMES[i])
+                isClickable = true
+                layoutParams = LinearLayout.LayoutParams(0, dp(56), 1f).also {
+                    if (i % 4 != 0) it.marginStart = gap
+                }
+                setOnClickListener {
+                    Prefs.setTileIcon(this@VaultActivity, i)
+                    buildTileIcons()
+                    renderTilePreview()
+                    refreshTile()
+                }
+            }
+            row?.addView(cell)
+        }
+    }
+
+    private fun saveTileName(showToast: Boolean) {
+        Prefs.setTileName(this, etTileName.text.toString().trim())
+        refreshTile()
+        if (showToast) {
+            hideKeyboard()
+            Toast.makeText(this, R.string.vault_saved, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /** Ask Android to re-read the tile so the new name shows up right away. */
+    private fun refreshTile() {
+        android.service.quicksettings.TileService.requestListeningState(
+            this, android.content.ComponentName(this, QuickTileService::class.java)
+        )
+    }
 
     // ---- Alert text ---------------------------------------------------------
 

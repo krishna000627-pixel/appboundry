@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quick tile page - preview</title>
+<style>
+:root{--bg:#fff;--card:#f4f4f8;--text:#111118;--dim:#5f5f70;--tonal:#ececf3;--accent:#5b4be0;--onacc:#fff;--input:#f4f4f8;--stroke:#e2e2ea}
+@media (prefers-color-scheme:dark){:root{--bg:#000;--card:#16161c;--text:#f2f2f7;--dim:#9a9aae;--tonal:#262634;--accent:#8b7cff;--onacc:#0f0b2e;--input:#101016;--stroke:#26262e}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.4 system-ui,sans-serif}
+.wrap{max-width:420px;margin:0 auto;padding:20px}
+.note{color:var(--dim);font-size:13px;margin:0 0 16px}
+.card{background:var(--card);border-radius:20px;padding:18px;margin-bottom:14px}
+.lbl{color:var(--dim);font-size:13px}
+.title{font-size:17px;font-weight:700}
+.row{display:flex;align-items:center;gap:12px;margin-top:8px}
+.row svg{width:26px;height:26px;fill:var(--text)}
+.pv{font-size:20px;font-weight:700}
+input{width:100%;margin-top:14px;padding:14px;border:1px solid var(--stroke);border-radius:14px;background:var(--input);color:var(--text);font-size:15px}
+.hint{color:var(--dim);font-size:13px;margin-top:8px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px}
+.cell{height:56px;border-radius:14px;border:0;background:var(--tonal);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.cell svg{width:26px;height:26px;fill:var(--text)}
+.cell.sel{background:var(--accent)}.cell.sel svg{fill:var(--onacc)}
+.btns{display:flex;gap:8px;margin-top:14px}
+.btn{flex:1;height:44px;border-radius:14px;border:0;font-weight:700;font-size:14px;background:var(--tonal);color:var(--text)}
+.btn.p{background:var(--accent);color:var(--onacc)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<p class="note">Preview of the Quick tile page. Tap an icon or type a name to try it. Follows your light or dark theme.</p>
+<div class="card">
+  <div class="lbl">Live preview</div>
+  <div class="row"><svg id="pvIcon" viewBox="0 0 24 24"><path id="pvPath" fill-rule="evenodd"/></svg><div class="pv" id="pvName">Keyboard</div></div>
+</div>
+<div class="card">
+  <div class="title">Tile icon</div>
+  <div class="grid" id="grid"></div>
+</div>
+<div class="card">
+  <div class="title">Tile name</div>
+  <input id="nm" maxlength="24" placeholder="Keyboard" autocomplete="off">
+  <div class="hint">The name shown under the Quick Settings button. Leave it empty to use the default.</div>
+  <div class="btns"><button class="btn" id="reset">Reset</button><button class="btn p">Save</button></div>
+</div>
+</div>
+<script>
+var icons=[
+  ["Shield","M12,2L4,5v6c0,5.55 3.84,10.74 8,12c4.16,-1.26 8,-6.45 8,-12V5L12,2z M10,10.5a2,2 0 1,0 4,0a2,2 0 1,0 -4,0z M11.2,12.7h1.6l0.6,3.8h-2.8z"],
+  ["Keyboard","M20,5H4C2.9,5 2,5.9 2,7v10c0,1.1 0.9,2 2,2h16c1.1,0 2,-0.9 2,-2V7C22,5.9 21.1,5 20,5zM11,8h2v2h-2V8zM11,11h2v2h-2V11zM8,8h2v2H8V8zM8,11h2v2H8V11zM7,13H5v-2h2V13zM7,10H5V8h2V10zM16,17H8v-2h8V17zM16,13h-2v-2h2V13zM16,10h-2V8h2V10zM19,13h-2v-2h2V13zM19,10h-2V8h2V10z"],
+  ["Calculator","M19,3H5C3.9,3 3,3.9 3,5v14c0,1.1 0.9,2 2,2h14c1.1,0 2,-0.9 2,-2V5C21,3.9 20.1,3 19,3zM7.5,18.5H6v-1.5h1.5V18.5zM7.5,15.5H6V14h1.5V15.5zM7.5,12.5H6V11h1.5V12.5zM11.5,18.5H10v-1.5h1.5V18.5zM11.5,15.5H10V14h1.5V15.5zM11.5,12.5H10V11h1.5V12.5zM18,18.5h-4.5V14H18V18.5zM18,12.5h-1.5V11H18V12.5zM15,12.5h-1.5V11H15V12.5zM18,9H6V6h12V9z"],
+  ["Notes","M14,2H6C4.9,2 4,2.9 4,4v16c0,1.1 0.9,2 2,2h12c1.1,0 2,-0.9 2,-2V8L14,2zM13,9V3.5L18.5,9H13zM8,13h8v1.5H8V13zM8,16h8v1.5H8V16z"],
+  ["Clock","M12,2C6.5,2 2,6.5 2,12s4.5,10 10,10s10,-4.5 10,-10S17.5,2 12,2zM16.2,16.2L11,13V7h1.5v5.2l4.5,2.7L16.2,16.2z"],
+  ["Calendar","M19,4h-1V2h-2v2H8V2H6v2H5C3.9,4 3,4.9 3,6v14c0,1.1 0.9,2 2,2h14c1.1,0 2,-0.9 2,-2V6C21,4.9 20.1,4 19,4zM19,20H5V10h14V20z"],
+  ["Cloud","M19.35,10.04C18.67,6.59 15.64,4 12,4C9.11,4 6.6,5.64 5.35,8.04C2.34,8.36 0,10.91 0,14c0,3.31 2.69,6 6,6h13c2.76,0 5,-2.24 5,-5C24,12.36 21.95,10.22 19.35,10.04z"],
+  ["Settings","M19.14,12.94c0.04,-0.3 0.06,-0.61 0.06,-0.94c0,-0.32 -0.02,-0.64 -0.07,-0.94l2.03,-1.58c0.18,-0.14 0.23,-0.41 0.12,-0.61l-1.92,-3.32c-0.12,-0.22 -0.37,-0.29 -0.59,-0.22l-2.39,0.96c-0.5,-0.38 -1.03,-0.7 -1.62,-0.94L14.4,2.81c-0.04,-0.24 -0.24,-0.41 -0.48,-0.41h-3.84c-0.24,0 -0.43,0.17 -0.47,0.41L9.25,5.35C8.66,5.59 8.12,5.92 7.63,6.29L5.24,5.33c-0.22,-0.08 -0.47,0 -0.59,0.22L2.74,8.87C2.62,9.08 2.66,9.34 2.86,9.48l2.03,1.58C4.84,11.36 4.8,11.69 4.8,12s0.02,0.64 0.07,0.94l-2.03,1.58c-0.18,0.14 -0.23,0.41 -0.12,0.61l1.92,3.32c0.12,0.22 0.37,0.29 0.59,0.22l2.39,-0.96c0.5,0.38 1.03,0.7 1.62,0.94l0.36,2.54c0.05,0.24 0.24,0.41 0.48,0.41h3.84c0.24,0 0.44,-0.17 0.47,-0.41l0.36,-2.54c0.59,-0.24 1.13,-0.56 1.62,-0.94l2.39,0.96c0.22,0.08 0.47,0 0.59,-0.22l1.92,-3.32c0.12,-0.22 0.07,-0.47 -0.12,-0.61L19.14,12.94zM12,15.6c-1.98,0 -3.6,-1.62 -3.6,-3.6s1.62,-3.6 3.6,-3.6s3.6,1.62 3.6,3.6S13.98,15.6 12,15.6z"]
+];
+var sel=0,grid=document.getElementById('grid'),nm=document.getElementById('nm');
+function draw(){
+  grid.innerHTML='';
+  icons.forEach(function(ic,i){
+    var b=document.createElement('button');
+    b.className='cell'+(i===sel?' sel':'');b.setAttribute('aria-label',ic[0]);
+    b.innerHTML='<svg viewBox="0 0 24 24"><path fill-rule="evenodd" d="'+ic[1]+'"/></svg>';
+    b.onclick=function(){sel=i;draw();};grid.appendChild(b);
+  });
+  document.getElementById('pvPath').setAttribute('d',icons[sel][1]);
+  document.getElementById('pvName').textContent=nm.value.trim()||'Keyboard';
+}
+nm.oninput=draw;
+document.getElementById('reset').onclick=function(){nm.value='';draw();};
+draw();
+</script>
+</body>
+</html>

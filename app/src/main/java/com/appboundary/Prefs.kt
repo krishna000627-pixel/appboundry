@@ -10,6 +10,8 @@ object Prefs {
     private const val KEY_ENABLED = "enabled"
     private const val KEY_TARGETS = "targets"
     private const val KEY_ALERT_TITLE = "alert_title"
+    private const val KEY_TILE_NAME = "tile_name"
+    private const val KEY_TILE_ICON = "tile_icon"
     private const val KEY_ALERT_MESSAGE = "alert_message"
     private const val KEY_UNLOCK_TAPS = "unlock_taps"
     private const val KEY_VOLUME_CODE = "code_volume"
@@ -82,6 +84,40 @@ object Prefs {
         if (message.isNullOrBlank()) editor.remove(KEY_ALERT_MESSAGE) else editor.putString(KEY_ALERT_MESSAGE, message)
         editor.apply()
     }
+
+    // ---- Quick Settings tile name (null = use the built-in name) -------------
+
+    fun tileName(context: Context): String? =
+        prefs(context).getString(KEY_TILE_NAME, null)?.takeIf { it.isNotBlank() }
+
+    fun setTileName(context: Context, name: String?) {
+        val editor = prefs(context).edit()
+        if (name.isNullOrBlank()) editor.remove(KEY_TILE_NAME) else editor.putString(KEY_TILE_NAME, name)
+        editor.apply()
+    }
+
+    // ---- Quick Settings tile icon (index into TILE_ICONS, 0 = built-in shield) ----
+
+    val TILE_ICONS = intArrayOf(
+        R.drawable.ic_tile, R.drawable.ic_tile_keyboard, R.drawable.ic_tile_calculator,
+        R.drawable.ic_tile_notes, R.drawable.ic_tile_clock, R.drawable.ic_tile_calendar,
+        R.drawable.ic_tile_cloud, R.drawable.ic_tile_gear
+    )
+
+    val TILE_ICON_NAMES = intArrayOf(
+        R.string.tile_icon_shield, R.string.tile_icon_keyboard, R.string.tile_icon_calculator,
+        R.string.tile_icon_notes, R.string.tile_icon_clock, R.string.tile_icon_calendar,
+        R.string.tile_icon_cloud, R.string.tile_icon_gear
+    )
+
+    fun tileIcon(context: Context): Int =
+        prefs(context).getInt(KEY_TILE_ICON, 0).coerceIn(0, TILE_ICONS.size - 1)
+
+    fun setTileIcon(context: Context, index: Int) {
+        prefs(context).edit().putInt(KEY_TILE_ICON, index).apply()
+    }
+
+    fun tileIconRes(context: Context): Int = TILE_ICONS[tileIcon(context)]
 
     // ---- Unlock methods -------------------------------------------------------
 

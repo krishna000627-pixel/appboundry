@@ -32,6 +32,19 @@
     <string name="vault_nav_alert">Alert screen</string>
     <string name="vault_nav_unlock">Unlock methods</string>
     <string name="vault_nav_security">Security</string>
+    <string name="vault_nav_tile">Quick tile</string>
+    <string name="vault_tile_title">Tile name</string>
+    <string name="vault_tile_hint">The name shown under the Quick Settings button. Leave it empty to use the default.</string>
+    <string name="vault_tile_icon_title">Tile icon</string>
+    <string name="tile_icon_shield">Shield</string>
+    <string name="tile_icon_keyboard">Keyboard</string>
+    <string name="tile_icon_calculator">Calculator</string>
+    <string name="tile_icon_notes">Notes</string>
+    <string name="tile_icon_clock">Clock</string>
+    <string name="tile_icon_calendar">Calendar</string>
+    <string name="tile_icon_cloud">Cloud</string>
+    <string name="tile_icon_gear">Settings</string>
+    <string name="vault_tile_preview_label">Live preview</string>
 
     <!-- Vault: PIN -->
     <string name="vault_pin_enter_title">Enter PIN</string>
