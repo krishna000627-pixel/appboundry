@@ -20,6 +20,9 @@ import android.text.format.Formatter
 import java.text.DateFormat
 import java.util.Date
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.widget.SeekBar
 import android.os.CountDownTimer
 import android.provider.Settings
 import android.service.quicksettings.TileService
@@ -104,8 +107,25 @@ class VaultActivity : Activity() {
     private lateinit var llSelectBar: View
     private lateinit var tvSelCount: TextView
     private lateinit var viewerLayer: View
-    private lateinit var ivViewer: ImageView
-    private lateinit var vvViewer: VideoView
+    private lateinit var pager: MediaPager
+    private lateinit var viewerTop: View
+    private lateinit var viewerBottom: View
+    private lateinit var btnPlay: TextView
+    private lateinit var llVideoBar: View
+    private lateinit var seekVideo: SeekBar
+    private lateinit var tvVideoTime: TextView
+    private lateinit var cardFocus: View
+    private var controlsVisible = true
+    private var viewerCount = 0
+    private var seeking = false
+    private val ui = Handler(Looper.getMainLooper())
+    private val progressTick = object : Runnable {
+        override fun run() {
+            updateVideoProgress()
+            ui.postDelayed(this, 250)
+        }
+    }
+    private val autoHide = Runnable { if (controlsVisible) setControls(false) }
     private lateinit var tvViewerTitle: TextView
     private lateinit var tvViewerInfo: TextView
     private val mediaAdapter = MediaAdapter()
@@ -323,8 +343,14 @@ class VaultActivity : Activity() {
         tvMediaCount = findViewById(R.id.tvMediaCount)
         btnHideMedia = findViewById(R.id.btnHideMedia)
         viewerLayer = findViewById(R.id.viewerLayer)
-        ivViewer = findViewById(R.id.ivViewer)
-        vvViewer = findViewById(R.id.vvViewer)
+        pager = findViewById(R.id.viewerPager)
+        viewerTop = findViewById(R.id.viewerTop)
+        viewerBottom = findViewById(R.id.viewerBottom)
+        btnPlay = findViewById(R.id.btnPlay)
+        llVideoBar = findViewById(R.id.llVideoBar)
+        seekVideo = findViewById(R.id.seekVideo)
+        tvVideoTime = findViewById(R.id.tvVideoTime)
+        cardFocus = findViewById(R.id.cardFocus)
         tvViewerTitle = findViewById(R.id.tvViewerTitle)
 
         llBlocked = findViewById(R.id.llBlocked)
@@ -725,8 +751,22 @@ class VaultActivity : Activity() {
         findViewById<View>(R.id.btnViewerBack).setOnClickListener { closeViewer() }
         findViewById<View>(R.id.btnViewerRestore).setOnClickListener { restoreViewing() }
         findViewById<View>(R.id.btnViewerDelete).setOnClickListener { confirmDeleteViewing() }
-        findViewById<View>(R.id.btnViewerPrev).setOnClickListener { stepViewer(-1) }
-        findViewById<View>(R.id.btnViewerNext).setOnClickListener { stepViewer(1) }
+        pager.host = pagerHost
+        btnPlay.setOnClickListener { toggleVideo() }
+        seekVideo.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {
+                val page = pager.currentPage()
+                if (fromUser && page.videoReady) page.video.seekTo(progress)
+            }
+
+            override fun onStartTrackingTouch(sb: SeekBar) {
+                seeking = true
+            }
+
+            override fun onStopTrackingTouch(sb: SeekBar) {
+                seeking = false
+            }
+        })
     }
 
     private fun setFilter(f: MediaFilter) {
@@ -758,6 +798,7 @@ class VaultActivity : Activity() {
         }
         mediaItems = if (newestFirst) filtered.sortedByDescending { it.added } else filtered.sortedBy { it.added }
         selected.retainAll(allMedia.map { it.id }.toSet())
+        syncViewer()
 
         val size = Formatter.formatFileSize(this, MediaVault.totalBytes(allMedia))
         tvMediaCount.text = getString(R.string.vault_media_summary, allMedia.size, size)
@@ -772,11 +813,13 @@ class VaultActivity : Activity() {
             return
         }
         llHomeMedia.visibility = View.VISIBLE
-        val thumb = dp(64)
-        for (item in allMedia.take(4)) {
+        val thumb = (resources.displayMetrics.widthPixels - dp(76) - dp(24)) / 4
+        val shown = if (allMedia.size > 4) allMedia.take(3) else allMedia
+        for (item in shown) {
             val iv = ImageView(this)
             iv.scaleType = ImageView.ScaleType.CENTER_CROP
-            iv.setBackgroundColor(getColor(R.color.vault_tonal))
+            iv.setBackgroundResource(R.drawable.bg_thumb)
+            iv.clipToOutline = true
             val lp = LinearLayout.LayoutParams(thumb, thumb)
             lp.marginEnd = dp(8)
             llHomeMedia.addView(iv, lp)
@@ -784,6 +827,16 @@ class VaultActivity : Activity() {
             MediaVault.thumb(item, thumb * 2) { bmp ->
                 if (iv.tag == item.id && bmp != null) iv.setImageBitmap(bmp)
             }
+        }
+        if (allMedia.size > 4) {
+            val more = TextView(this)
+            more.text = "+" + (allMedia.size - 3)
+            more.gravity = Gravity.CENTER
+            more.textSize = 18f
+            more.setTypeface(null, android.graphics.Typeface.BOLD)
+            more.setTextColor(getColor(R.color.vault_accent))
+            more.setBackgroundResource(R.drawable.bg_thumb)
+            llHomeMedia.addView(more, LinearLayout.LayoutParams(thumb, thumb))
         }
     }
 
@@ -941,22 +994,56 @@ class VaultActivity : Activity() {
 
     // -- viewer --
 
+    private val pagerHost = object : MediaPager.Host {
+        override fun count(): Int = mediaItems.size
+        override fun bind(page: MediaPager.Page, index: Int) = bindViewerPage(page, index)
+        override fun onTap() = setControls(!controlsVisible)
+        override fun onSettled(index: Int) = onViewerSettled(index)
+        override fun onDragProgress(progress: Float) {
+            viewerLayer.alpha = 1f - 0.75f * progress
+        }
+
+        override fun onDismiss() = closeViewer()
+    }
+
     private fun openViewer(item: MediaVault.Item) {
+        val idx = mediaItems.indexOfFirst { it.id == item.id }
+        if (idx < 0) return
         viewing = item
-        viewIndex = mediaItems.indexOfFirst { it.id == item.id }
-        showViewing()
+        viewIndex = idx
+        viewerCount = mediaItems.size
+        viewerLayer.alpha = 1f
+        viewerLayer.visibility = View.VISIBLE
+        setControls(true, false)
+        pager.open(idx)
     }
 
-    private fun stepViewer(delta: Int) {
-        val next = viewIndex + delta
-        if (next !in mediaItems.indices) return
-        viewIndex = next
-        viewing = mediaItems[next]
-        showViewing()
+    private fun bindViewerPage(page: MediaPager.Page, index: Int) {
+        val item = mediaItems.getOrNull(index) ?: return
+        page.resetState()
+        page.token = item.id
+        page.isVideo = item.video
+        page.image.setImageDrawable(null)
+        val maxPx = maxOf(resources.displayMetrics.widthPixels, resources.displayMetrics.heightPixels)
+        if (item.video) {
+            MediaVault.thumb(item, maxPx / 2) { bmp: Bitmap? ->
+                if (page.token == item.id && bmp != null) page.image.setImageBitmap(bmp)
+            }
+        } else {
+            Thread {
+                val bmp = MediaVault.decode(item, maxPx)
+                runOnUiThread {
+                    if (!isDestroyed && page.token == item.id) page.image.setImageBitmap(bmp)
+                }
+            }.start()
+        }
     }
 
-    private fun showViewing() {
-        val item = viewing ?: return
+    private fun onViewerSettled(index: Int) {
+        val item = mediaItems.getOrNull(index) ?: return
+        viewIndex = index
+        viewing = item
+        stopVideoUi()
         tvViewerTitle.text = item.name
         val type = getString(if (item.video) R.string.vault_type_video else R.string.vault_type_photo)
         val date = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(item.added))
@@ -965,45 +1052,133 @@ class VaultActivity : Activity() {
             type,
             Formatter.formatFileSize(this, item.file.length()),
             date,
-            viewIndex + 1,
+            index + 1,
             mediaItems.size
         )
-        viewerLayer.visibility = View.VISIBLE
-        try {
-            vvViewer.stopPlayback()
-        } catch (e: Exception) {
+        llVideoBar.visibility = if (item.video) View.VISIBLE else View.GONE
+        btnPlay.animate().cancel()
+        btnPlay.alpha = 1f
+        btnPlay.visibility = if (item.video && controlsVisible) View.VISIBLE else View.GONE
+        setPlayIcon(false)
+        seekVideo.progress = 0
+        tvVideoTime.text = ""
+    }
+
+    /** Tap on the picture: hide or show the title bar, buttons and play control. */
+    private fun setControls(show: Boolean, animate: Boolean = true) {
+        controlsVisible = show
+        ui.removeCallbacks(autoHide)
+        val isVideo = viewing?.video == true
+        for (v in listOf(viewerTop, viewerBottom, btnPlay)) {
+            v.animate().cancel()
+            val allowed = v !== btnPlay || isVideo
+            if (show && allowed) {
+                v.visibility = View.VISIBLE
+                if (animate) v.animate().alpha(1f).setDuration(160).start() else v.alpha = 1f
+            } else if (animate && v.visibility == View.VISIBLE) {
+                v.animate().alpha(0f).setDuration(160).withEndAction {
+                    if (!controlsVisible || !allowed) v.visibility = View.GONE
+                }.start()
+            } else {
+                v.alpha = if (show) 1f else 0f
+                v.visibility = View.GONE
+            }
         }
-        if (item.video) {
-            ivViewer.setImageDrawable(null)
-            ivViewer.visibility = View.GONE
-            vvViewer.visibility = View.VISIBLE
-            vvViewer.setMediaController(MediaController(this).also { it.setAnchorView(vvViewer) })
-            vvViewer.setVideoPath(item.file.absolutePath)
-            vvViewer.start()
-        } else {
-            vvViewer.visibility = View.GONE
-            ivViewer.visibility = View.VISIBLE
-            ivViewer.setImageDrawable(null)
-            val maxPx = maxOf(resources.displayMetrics.widthPixels, resources.displayMetrics.heightPixels)
-            Thread {
-                val bmp = MediaVault.decode(item, maxPx)
-                runOnUiThread {
-                    if (!isDestroyed && viewing?.id == item.id) ivViewer.setImageBitmap(bmp)
-                }
-            }.start()
+        if (show && isPlayingVideo()) ui.postDelayed(autoHide, 2500)
+    }
+
+    private fun isPlayingVideo(): Boolean {
+        val p = pager.currentPage()
+        return p.isVideo && p.videoReady && p.video.isPlaying
+    }
+
+    private fun setPlayIcon(playing: Boolean) {
+        btnPlay.setText(if (playing) R.string.vault_media_pause else R.string.vault_media_play)
+    }
+
+    private fun toggleVideo() {
+        val page = pager.currentPage()
+        val item = viewing
+        if (!page.isVideo || item == null) return
+        val v = page.video
+        if (page.videoReady) {
+            if (v.isPlaying) {
+                v.pause()
+                setPlayIcon(false)
+                ui.removeCallbacks(autoHide)
+            } else {
+                v.start()
+                setPlayIcon(true)
+                ui.postDelayed(autoHide, 2500)
+            }
+            return
         }
+        v.visibility = View.VISIBLE
+        v.setOnPreparedListener {
+            page.videoReady = true
+            page.image.visibility = View.INVISIBLE
+            seekVideo.max = v.duration
+            v.start()
+            setPlayIcon(true)
+            ui.removeCallbacks(progressTick)
+            ui.post(progressTick)
+            ui.postDelayed(autoHide, 2500)
+        }
+        v.setOnCompletionListener {
+            setPlayIcon(false)
+            ui.removeCallbacks(autoHide)
+            updateVideoProgress()
+            setControls(true)
+        }
+        v.setOnErrorListener { _, _, _ ->
+            Toast.makeText(this, R.string.vault_media_restore_failed, Toast.LENGTH_SHORT).show()
+            true
+        }
+        v.setVideoPath(item.file.absolutePath)
+    }
+
+    private fun updateVideoProgress() {
+        val page = pager.currentPage()
+        if (!page.isVideo || !page.videoReady) return
+        val pos = page.video.currentPosition
+        val dur = page.video.duration
+        if (!seeking) seekVideo.progress = pos
+        tvVideoTime.text = clock(pos) + " / " + clock(dur)
+    }
+
+    private fun clock(ms: Int): String {
+        val sec = ms / 1000
+        return String.format(java.util.Locale.US, "%d:%02d", sec / 60, sec % 60)
+    }
+
+    private fun stopVideoUi() {
+        ui.removeCallbacks(progressTick)
+        ui.removeCallbacks(autoHide)
+    }
+
+    /** Keeps the open viewer in step after items were restored, deleted or re-sorted. */
+    private fun syncViewer() {
+        if (viewerLayer.visibility != View.VISIBLE) return
+        if (mediaItems.isEmpty()) {
+            closeViewer()
+            return
+        }
+        val cur = viewing
+        val idx = if (cur == null) -1 else mediaItems.indexOfFirst { it.id == cur.id }
+        if (idx >= 0 && idx == pager.index && mediaItems.size == viewerCount) return
+        viewerCount = mediaItems.size
+        viewIndex = if (idx >= 0) idx else viewIndex.coerceIn(0, mediaItems.size - 1)
+        pager.open(viewIndex)
     }
 
     private fun closeViewer() {
         if (!::viewerLayer.isInitialized) return
+        stopVideoUi()
         viewing = null
         viewIndex = -1
-        try {
-            vvViewer.stopPlayback()
-        } catch (e: Exception) {
-        }
-        ivViewer.setImageDrawable(null)
+        pager.release()
         viewerLayer.visibility = View.GONE
+        viewerLayer.alpha = 1f
     }
 
     private fun restoreViewing() {
@@ -1014,7 +1189,6 @@ class VaultActivity : Activity() {
             runOnUiThread {
                 if (isDestroyed) return@runOnUiThread
                 if (ok) {
-                    closeViewer()
                     refreshMedia()
                     Toast.makeText(this, R.string.vault_media_restored, Toast.LENGTH_LONG).show()
                 } else {
@@ -1032,7 +1206,6 @@ class VaultActivity : Activity() {
             .setNegativeButton(R.string.vault_media_cancel, null)
             .setPositiveButton(R.string.vault_media_delete) { _, _ ->
                 MediaVault.delete(this, item)
-                closeViewer()
                 refreshMedia()
             }
             .show()
@@ -1094,9 +1267,27 @@ class VaultActivity : Activity() {
             item.setBackgroundResource(if (selected) R.drawable.bg_nav_selected else 0)
             item.setTextColor(getColor(if (selected) R.color.vault_accent else R.color.vault_text))
         }
+        styleBottomNav(page)
         closeDrawer(true)
         refreshAll()
         if (page == Page.PHOTOS) maybeAskAllFiles()
+    }
+
+    private fun styleBottomNav(page: Page) {
+        val map = listOf(R.id.bnHome to Page.HOME, R.id.bnPhotos to Page.PHOTOS, R.id.bnApps to Page.BLOCKED)
+        var any = false
+        for ((id, p) in map) {
+            val on = p == page
+            if (on) any = true
+            tintBottomItem(findViewById(id), on)
+        }
+        tintBottomItem(findViewById(R.id.bnMore), !any)
+    }
+
+    private fun tintBottomItem(item: ViewGroup, on: Boolean) {
+        val color = getColor(if (on) R.color.vault_accent else R.color.vault_text_dim)
+        (item.getChildAt(0) as ImageView).setColorFilter(color)
+        (item.getChildAt(1) as TextView).setTextColor(color)
     }
 
     private fun openDrawer() {
@@ -1129,6 +1320,12 @@ class VaultActivity : Activity() {
             if (drawerOpen) closeDrawer(true) else openDrawer()
         }
         scrim.setOnClickListener { closeDrawer(true) }
+        findViewById<View>(R.id.bnHome).setOnClickListener { showPage(Page.HOME) }
+        findViewById<View>(R.id.bnPhotos).setOnClickListener { showPage(Page.PHOTOS) }
+        findViewById<View>(R.id.bnApps).setOnClickListener { showPage(Page.BLOCKED) }
+        findViewById<View>(R.id.bnMore).setOnClickListener {
+            if (drawerOpen) closeDrawer(true) else openDrawer()
+        }
         for ((page, item) in navItems) item.setOnClickListener { showPage(page) }
 
         // Home
@@ -1204,6 +1401,7 @@ class VaultActivity : Activity() {
     private fun renderFocusState(on: Boolean) {
         tvFocusState.setText(if (on) R.string.vault_focus_on else R.string.vault_focus_off)
         tvFocusState.setTextColor(getColor(if (on) R.color.vault_ok else R.color.vault_text_dim))
+        cardFocus.setBackgroundResource(if (on) R.drawable.bg_hero_on else R.drawable.bg_vault_card)
     }
 
     private fun isServiceEnabled(): Boolean {

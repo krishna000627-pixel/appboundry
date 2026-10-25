@@ -140,6 +140,8 @@
                 <include layout="@layout/page_unlock" />
                 <include layout="@layout/page_security" />
             </FrameLayout>
+
+            <include layout="@layout/bar_bottom_nav" />
         </LinearLayout>
 
         <!-- Dim layer behind the drawer -->

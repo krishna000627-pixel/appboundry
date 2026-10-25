@@ -156,4 +156,11 @@
     <string name="vault_type_video">Video</string>
     <string name="vault_viewer_info">%1$s &#183; %2$s &#183; %3$s &#183; %4$d / %5$d</string>
     <string name="vault_media_empty_short">Nothing hidden yet</string>
+
+    <string name="vault_bnav_home">Home</string>
+    <string name="vault_bnav_photos">Photos</string>
+    <string name="vault_bnav_apps">Apps</string>
+    <string name="vault_bnav_more">More</string>
+    <string name="vault_media_pause">&#10074;&#10074;</string>
+    <string name="vault_home_media_hint">Tap to view and manage</string>
 </resources>
