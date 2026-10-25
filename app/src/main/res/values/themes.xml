@@ -10,7 +10,7 @@
     </style>
 
     <!-- Vault: dark, calm, edge to edge colors. -->
-    <style name="Theme.AppBoundary.Vault" parent="@android:style/Theme.DeviceDefault.NoActionBar">
+    <style name="Theme.AppBoundary.Vault" parent="@android:style/Theme.DeviceDefault.Light.NoActionBar">
         <item name="android:windowBackground">@color/vault_bg</item>
         <item name="android:statusBarColor">@color/vault_bg</item>
         <item name="android:navigationBarColor">@color/vault_bg</item>
@@ -60,6 +60,7 @@
     </style>
 
     <style name="Vault.Button.Primary">
+        <item name="android:textColor">#FFFFFF</item>
         <item name="android:background">@drawable/bg_btn_primary</item>
     </style>
 
@@ -72,7 +73,7 @@
     </style>
 
     <!-- Dialogs: dark rounded card instead of the grey stock box. -->
-    <style name="Vault.Dialog" parent="@android:style/Theme.DeviceDefault.Dialog.Alert">
+    <style name="Vault.Dialog" parent="@android:style/Theme.DeviceDefault.Light.Dialog.Alert">
         <item name="android:windowBackground">@drawable/bg_dialog</item>
         <item name="android:colorBackground">@color/vault_card</item>
         <item name="android:colorAccent">@color/vault_accent</item>

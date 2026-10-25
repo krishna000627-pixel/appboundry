@@ -70,6 +70,52 @@
                 android:text="@string/vault_change_pin" />
         </LinearLayout>
 
+        <!-- Theme -->
+        <LinearLayout
+            style="@style/Vault.Card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:orientation="vertical">
+
+            <TextView
+                style="@style/Vault.CardTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/vault_theme_title" />
+
+            <TextView
+                style="@style/Vault.Body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/vault_theme_desc" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/btnThemeLight"
+                    style="@style/Vault.Button"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_weight="1"
+                    android:text="@string/vault_theme_light" />
+
+                <TextView
+                    android:id="@+id/btnThemeDark"
+                    style="@style/Vault.Button"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:text="@string/vault_theme_dark" />
+            </LinearLayout>
+        </LinearLayout>
+
         <!-- Permissions -->
         <LinearLayout
             style="@style/Vault.Card"

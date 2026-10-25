@@ -110,6 +110,15 @@
     <string name="vault_sel_none">Select items</string>
     <string name="vault_sel_one">1 item selected</string>
     <string name="vault_sel_many">%1$d items selected</string>
+    <string name="vault_search_title">Search</string>
+    <string name="vault_more">More</string>
+    <string name="vault_more_select">Select items</string>
+    <string name="vault_more_sort_new">Sort: newest first</string>
+    <string name="vault_more_sort_old">Sort: oldest first</string>
+    <string name="vault_theme_title">Theme</string>
+    <string name="vault_theme_desc">White is the default. Switching locks the vault once.</string>
+    <string name="vault_theme_light">White</string>
+    <string name="vault_theme_dark">Dark</string>
     <string name="vault_add_title">Add to vault</string>
     <string name="vault_add_gallery">Photos &amp; videos (gallery)</string>
     <string name="vault_add_files">Browse files</string>

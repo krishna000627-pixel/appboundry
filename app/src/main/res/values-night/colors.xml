@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="vault_bg">#000000</color>
+    <color name="vault_card">#16161C</color>
+    <color name="vault_stroke">#26262E</color>
+    <color name="vault_text">#F2F2F7</color>
+    <color name="vault_text_dim">#9A9AAE</color>
+    <color name="vault_accent">#8B7CFF</color>
+    <color name="vault_tonal">#262634</color>
+    <color name="vault_key">#1C1C26</color>
+    <color name="vault_danger">#FF6B6B</color>
+    <color name="vault_ok">#4ADE80</color>
+    <color name="vault_track_on">#4B4399</color>
+    <color name="vault_track_off">#33333F</color>
+    <color name="icon_bg">#0E0E13</color>
+    <color name="vault_icon">#FFFFFF</color>
+    <color name="vault_ripple">#33FFFFFF</color>
+    <color name="vault_nav_sel">#1E1A3C</color>
+    <color name="vault_input">#101016</color>
+    <color name="vault_sheet">#E617171F</color>
+    <color name="vault_handle">#66FFFFFF</color>
+    <color name="vault_hero_a">#2E2860</color>
+    <color name="vault_hero_b">#17171F</color>
+    <color name="vault_hero_stroke">#5B4FD6</color>
+    <color name="vault_blue">#3D7BFF</color>
+</resources>

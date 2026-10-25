@@ -4,7 +4,6 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:paddingTop="20dp"
     android:visibility="gone">
 
     <!-- All files access (shown only while it is off) -->
@@ -14,6 +13,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginStart="20dp"
+        android:layout_marginTop="20dp"
         android:layout_marginEnd="20dp"
         android:layout_marginBottom="14dp"
         android:orientation="vertical"
@@ -47,19 +47,18 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="20dp"
-        android:layout_marginTop="12dp" />
+        android:layout_marginTop="32dp" />
 
     <!-- Folder page header, like the gallery: back, name, item count, sort -->
     <LinearLayout
         android:id="@+id/llFolderHeader"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="80dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingStart="8dp"
-        android:paddingTop="4dp"
-        android:paddingEnd="16dp"
-        android:paddingBottom="8dp"
+        android:paddingStart="4dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="4dp"
         android:visibility="gone">
 
         <ImageView
@@ -76,7 +75,7 @@
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
+            android:layout_marginStart="4dp"
             android:layout_weight="1"
             android:orientation="vertical">
 
@@ -111,23 +110,42 @@
 
         <TextView
             android:id="@+id/btnSort"
-            style="@style/Vault.NavItem"
-            android:layout_width="wrap_content"
-            android:layout_height="40dp"
-            android:paddingStart="10dp"
-            android:paddingEnd="0dp"
-            android:textColor="@color/vault_text_dim"
-            android:textSize="13sp" />
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+
+        <ImageView
+            android:id="@+id/btnSearch"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_key_flat"
+            android:clickable="true"
+            android:contentDescription="@string/vault_search_title"
+            android:focusable="true"
+            android:padding="12dp"
+            android:src="@drawable/ic_search" />
+
+        <ImageView
+            android:id="@+id/btnMore"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_key_flat"
+            android:clickable="true"
+            android:contentDescription="@string/vault_more"
+            android:focusable="true"
+            android:padding="12dp"
+            android:src="@drawable/ic_more" />
     </LinearLayout>
 
     <!-- Selection top bar: Cancel, count, Select all -->
     <LinearLayout
         android:id="@+id/llSelectTop"
         android:layout_width="match_parent"
-        android:layout_height="56dp"
+        android:layout_height="80dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingStart="20dp"
+        android:paddingTop="8dp"
         android:paddingEnd="20dp"
         android:visibility="gone">
 
@@ -141,8 +159,8 @@
             android:focusable="true"
             android:gravity="center_vertical|start"
             android:text="@string/vault_media_cancel"
-            android:textColor="@color/vault_accent"
-            android:textSize="18sp" />
+            android:textColor="@color/vault_blue"
+            android:textSize="20sp" />
 
         <TextView
             android:id="@+id/tvSelCount"
@@ -150,7 +168,7 @@
             android:layout_height="wrap_content"
             android:gravity="center"
             android:textColor="@color/vault_text"
-            android:textSize="18sp" />
+            android:textSize="20sp" />
 
         <TextView
             android:id="@+id/btnSelAll"
@@ -162,8 +180,8 @@
             android:focusable="true"
             android:gravity="center_vertical|end"
             android:text="@string/vault_sel_all_long"
-            android:textColor="@color/vault_accent"
-            android:textSize="18sp" />
+            android:textColor="@color/vault_blue"
+            android:textSize="20sp" />
     </LinearLayout>
 
     <FrameLayout
@@ -201,12 +219,12 @@
         android:id="@+id/llSelectBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/vault_card"
+        android:background="@color/vault_bg"
         android:orientation="horizontal"
-        android:paddingStart="8dp"
-        android:paddingTop="8dp"
-        android:paddingEnd="8dp"
-        android:paddingBottom="12dp"
+        android:paddingStart="0dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="0dp"
+        android:paddingBottom="14dp"
         android:visibility="gone">
 
         <LinearLayout
@@ -219,22 +237,22 @@
             android:focusable="true"
             android:gravity="center_horizontal"
             android:orientation="vertical"
-            android:paddingTop="6dp"
-            android:paddingBottom="6dp">
+            android:paddingTop="0dp"
+            android:paddingBottom="0dp">
 
             <ImageView
-                android:layout_width="28dp"
-                android:layout_height="28dp"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
                 android:contentDescription="@null"
-                android:src="@drawable/ic_photos" />
+                android:src="@drawable/ic_o_photo" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
                 android:text="@string/vault_sel_restore"
-                android:textColor="#FFFFFF"
-                android:textSize="12sp" />
+                android:textColor="@color/vault_text"
+                android:textSize="13sp" />
         </LinearLayout>
 
         <LinearLayout
@@ -247,22 +265,22 @@
             android:focusable="true"
             android:gravity="center_horizontal"
             android:orientation="vertical"
-            android:paddingTop="6dp"
-            android:paddingBottom="6dp">
+            android:paddingTop="0dp"
+            android:paddingBottom="0dp">
 
             <ImageView
-                android:layout_width="28dp"
-                android:layout_height="28dp"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
                 android:contentDescription="@null"
-                android:src="@drawable/ic_folder" />
+                android:src="@drawable/ic_o_folder" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
                 android:text="@string/vault_sel_move"
-                android:textColor="#FFFFFF"
-                android:textSize="12sp" />
+                android:textColor="@color/vault_text"
+                android:textSize="13sp" />
         </LinearLayout>
 
         <LinearLayout
@@ -275,14 +293,14 @@
             android:focusable="true"
             android:gravity="center_horizontal"
             android:orientation="vertical"
-            android:paddingTop="6dp"
-            android:paddingBottom="6dp">
+            android:paddingTop="0dp"
+            android:paddingBottom="0dp">
 
             <ImageView
-                android:layout_width="28dp"
-                android:layout_height="28dp"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
                 android:contentDescription="@null"
-                android:src="@drawable/ic_delete"
+                android:src="@drawable/ic_o_delete"
                 android:tint="@color/vault_danger" />
 
             <TextView
@@ -290,8 +308,8 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
                 android:text="@string/vault_media_delete"
-                android:textColor="#FFFFFF"
-                android:textSize="12sp" />
+                android:textColor="@color/vault_text"
+                android:textSize="13sp" />
         </LinearLayout>
     </LinearLayout>
 </LinearLayout>

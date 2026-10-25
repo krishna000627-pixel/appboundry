@@ -19,6 +19,7 @@ object Prefs {
     private const val KEY_FAILS = "pin_fails"
     private const val KEY_LOCK_UNTIL = "pin_lock_until"
     private const val KEY_BLOCK_SHOTS = "block_screenshots"
+    private const val KEY_THEME = "theme"
 
     const val MIN_TAPS = 2
     const val MAX_TAPS = 6
@@ -116,6 +117,13 @@ object Prefs {
     }
 
     // ---- Vault PIN -----------------------------------------------------------
+
+    /** White is the default; "dark" is opt-in from the security page. */
+    fun isDark(context: Context): Boolean = prefs(context).getString(KEY_THEME, "light") == "dark"
+
+    fun setDark(context: Context, dark: Boolean) {
+        prefs(context).edit().putString(KEY_THEME, if (dark) "dark" else "light").apply()
+    }
 
     fun hasPin(context: Context): Boolean = prefs(context).contains(KEY_PIN_HASH)
 

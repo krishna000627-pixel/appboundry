@@ -3,6 +3,8 @@ package com.appboundary
 import android.animation.ObjectAnimator
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.Context
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.net.Uri
 import android.provider.DocumentsContract
@@ -162,6 +164,7 @@ class VaultActivity : Activity() {
     private var folderCellH = 0
     private val folderAdapter = FolderAdapter()
     private var newestFirst = true
+    private var searchQuery = ""
     private var selectMode = false
     private val selected = LinkedHashSet<String>()
     private var viewing: MediaVault.Item? = null
@@ -224,11 +227,36 @@ class VaultActivity : Activity() {
 
     // ---- Lifecycle ----------------------------------------------------------
 
+    override fun attachBaseContext(base: Context) {
+        val cfg = Configuration(base.resources.configuration)
+        val night = if (Prefs.isDark(base)) Configuration.UI_MODE_NIGHT_YES else Configuration.UI_MODE_NIGHT_NO
+        cfg.uiMode = (cfg.uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or night
+        super.attachBaseContext(base.createConfigurationContext(cfg))
+    }
+
+    /** Dark or light status/navigation bar icons. */
+    private fun setBarIcons(lightBars: Boolean) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val mask = WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
+            window.insetsController?.setSystemBarsAppearance(if (lightBars) mask else 0, mask)
+        } else {
+            @Suppress("DEPRECATION")
+            var f = window.decorView.systemUiVisibility
+            f = if (lightBars) f or View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR else f and View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR.inv()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                f = if (lightBars) f or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR else f and View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR.inv()
+            }
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = f
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Hidden photos must not show up in screenshots or the recents preview.
         applyShotFlag()
         setContentView(R.layout.activity_vault)
+        setBarIcons(!Prefs.isDark(this))
         bindViews()
         buildDots()
         buildKeypad()
@@ -750,7 +778,7 @@ class VaultActivity : Activity() {
     // ---- Photos and videos --------------------------------------------------
 
     private fun bindMedia() {
-        cellPx = (resources.displayMetrics.widthPixels - dp(6)) / 4
+        cellPx = (resources.displayMetrics.widthPixels - dp(3)) / 4
         folderCellH = (((resources.displayMetrics.widthPixels - dp(40) - dp(6)) / 2) * 0.8f).toInt()
         gvMedia.numColumns = 2
         gvMedia.adapter = folderAdapter
@@ -785,6 +813,27 @@ class VaultActivity : Activity() {
         findViewById<View>(R.id.btnCleanOriginals).setOnClickListener { cleanOriginals() }
         tabAll.setOnClickListener { closeFolder() }
         findViewById<View>(R.id.btnFolderBack).setOnClickListener { closeFolder() }
+        findViewById<View>(R.id.btnSearch).setOnClickListener {
+            nameDialog(R.string.vault_search_title, searchQuery, android.R.string.ok) { q ->
+                searchQuery = q
+                refreshMedia()
+            }
+        }
+        findViewById<View>(R.id.btnMore).setOnClickListener {
+            val sort = getString(if (newestFirst) R.string.vault_more_sort_old else R.string.vault_more_sort_new)
+            AlertDialog.Builder(this, R.style.Vault_Dialog)
+                .setItems(arrayOf(getString(R.string.vault_more_select), sort)) { _, which ->
+                    if (which == 0) {
+                        if (mediaItems.isNotEmpty()) {
+                            selectMode = true
+                            renderSelection()
+                        }
+                    } else {
+                        btnSort.performClick()
+                    }
+                }
+                .show()
+        }
         btnSort.setOnClickListener {
             newestFirst = !newestFirst
             refreshMedia()
@@ -825,6 +874,7 @@ class VaultActivity : Activity() {
     }
 
     private fun closeFolder() {
+        searchQuery = ""
         exitSelect()
         openFolder = null
         refreshMedia()
@@ -850,8 +900,8 @@ class VaultActivity : Activity() {
             gridShowsFolders = !inFolder
             if (inFolder) {
                 gvMedia.numColumns = 4
-                gvMedia.horizontalSpacing = dp(2)
-                gvMedia.verticalSpacing = dp(2)
+                gvMedia.horizontalSpacing = dp(1)
+                gvMedia.verticalSpacing = dp(1)
                 gvMedia.setPadding(0, 0, 0, dp(20))
                 gvMedia.adapter = mediaAdapter
             } else {
@@ -865,6 +915,10 @@ class VaultActivity : Activity() {
         folderAdapter.notifyDataSetChanged()
         val vis = if (inFolder) View.VISIBLE else View.GONE
         findViewById<View>(R.id.llFolderHeader).visibility = vis
+        updateTopBar()
+        findViewById<ImageView>(R.id.btnSearch).let {
+            if (searchQuery.isEmpty()) it.clearColorFilter() else it.setColorFilter(getColor(R.color.vault_accent))
+        }
         tvMediaCount.visibility = if (inFolder) View.GONE else View.VISIBLE
         tabAll.visibility = vis
         tabPhotos.visibility = View.GONE
@@ -892,6 +946,7 @@ class VaultActivity : Activity() {
             emptyList()
         } else {
             val l = folderList.first { it.key == cur }.items
+                .filter { searchQuery.isEmpty() || it.name.contains(searchQuery, true) }
             if (newestFirst) l.sortedByDescending { it.added } else l.sortedBy { it.added }
         }
         btnSort.setText(if (newestFirst) R.string.vault_sort_newest else R.string.vault_sort_oldest)
@@ -1331,31 +1386,13 @@ class VaultActivity : Activity() {
         fitPager(animate)
     }
 
-    /** Controls showing: the picture is reduced to the space between the bars. Hidden: it fills the page. */
-    /** Controls showing: the picture is reduced to the space between the bars. Hidden: it fills the page. */
+    /** Like the gallery: the picture fills the page and the bars float over it. */
     private fun fitPager(animate: Boolean, retry: Boolean = true) {
-        var scale = 1f
-        var ty = 0f
-        if (controlsVisible) {
-            val h = pager.height
-            val top = viewerTop.height
-            val bottom = viewerBottom.height
-            if (h <= 0 || top <= 0 || bottom <= 0) {
-                if (retry) viewerLayer.post { fitPager(false, false) }
-                return
-            }
-            scale = ((h - top - bottom).toFloat() / h).coerceIn(0.3f, 1f)
-            ty = (top - bottom) / 2f
-        }
         pager.animate().cancel()
-        if (animate) {
-            pager.animate().scaleX(scale).scaleY(scale).translationY(ty).setDuration(180).start()
-        } else {
-            pager.scaleX = scale
-            pager.scaleY = scale
-            pager.translationY = ty
-        }
-        btnPlay.translationY = ty
+        pager.scaleX = 1f
+        pager.scaleY = 1f
+        pager.translationY = 0f
+        btnPlay.translationY = 0f
     }
 
     private fun isPlayingVideo(): Boolean {
@@ -1470,14 +1507,15 @@ class VaultActivity : Activity() {
         window.navigationBarColor = Color.TRANSPARENT
         viewerLayer.setOnApplyWindowInsetsListener { _, insets ->
             val bars = insets.getInsets(WindowInsets.Type.systemBars())
-            viewerTop.layoutParams = viewerTop.layoutParams.also { it.height = dp(72) + bars.top }
-            viewerTop.setPadding(dp(8), dp(8) + bars.top, dp(16), 0)
-            viewerBottom.setPadding(dp(16), dp(28), dp(16), dp(16) + bars.bottom)
+            viewerTop.layoutParams = viewerTop.layoutParams.also { it.height = dp(70) + bars.top }
+            viewerTop.setPadding(dp(4), dp(20) + bars.top, dp(16), 0)
+            viewerBottom.setPadding(0, dp(6), 0, bars.bottom)
             sheetPanel.setPadding(dp(8), dp(10), dp(8), dp(16) + bars.bottom)
             viewerLayer.post { fitPager(false) }
             insets
         }
         viewerLayer.requestApplyInsets()
+        setBarIcons(false)
     }
 
     private fun exitFullScreen() {
@@ -1488,6 +1526,7 @@ class VaultActivity : Activity() {
         window.setDecorFitsSystemWindows(true)
         window.statusBarColor = getColor(R.color.vault_bg)
         window.navigationBarColor = getColor(R.color.vault_bg)
+        setBarIcons(!Prefs.isDark(this))
     }
 
     private fun applyBars(show: Boolean) {
@@ -1566,7 +1605,7 @@ class VaultActivity : Activity() {
         return out
     }
 
-    private fun nameDialog(titleRes: Int, start: String, onOk: (String) -> Unit) {
+    private fun nameDialog(titleRes: Int, start: String, okRes: Int = R.string.vault_folder_create, onOk: (String) -> Unit) {
         val input = EditText(this)
         input.setText(start)
         input.setSingleLine()
@@ -1584,7 +1623,7 @@ class VaultActivity : Activity() {
             .setTitle(titleRes)
             .setView(box)
             .setNegativeButton(R.string.vault_media_cancel, null)
-            .setPositiveButton(R.string.vault_folder_create) { _, _ -> onOk(input.text.toString().trim()) }
+            .setPositiveButton(okRes) { _, _ -> onOk(input.text.toString().trim()) }
             .create()
         dlg.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE)
         dlg.show()
@@ -1810,6 +1849,11 @@ class VaultActivity : Activity() {
         AppCache.sync(this) { }
     }
 
+    private fun updateTopBar() {
+        findViewById<View>(R.id.vaultTopBar).visibility =
+            if (currentPage == Page.PHOTOS && openFolder != null) View.GONE else View.VISIBLE
+    }
+
     private fun showPage(page: Page) {
         stopRecording()
         if (page != Page.PHOTOS && selectMode) exitSelect()
@@ -1828,6 +1872,7 @@ class VaultActivity : Activity() {
             item.setBackgroundResource(if (selected) R.drawable.bg_nav_selected else 0)
             item.setTextColor(getColor(if (selected) R.color.vault_accent else R.color.vault_text))
         }
+        updateTopBar()
         closeDrawer(true)
         refreshAll()
         if (page == Page.PHOTOS) maybeAskAllFiles()
@@ -1898,6 +1943,15 @@ class VaultActivity : Activity() {
         }
 
         // Security
+        val btnLight = findViewById<TextView>(R.id.btnThemeLight)
+        val btnDark = findViewById<TextView>(R.id.btnThemeDark)
+        val darkNow = Prefs.isDark(this)
+        btnLight.setBackgroundResource(if (!darkNow) R.drawable.bg_btn_primary else R.drawable.bg_btn_tonal)
+        btnDark.setBackgroundResource(if (darkNow) R.drawable.bg_btn_primary else R.drawable.bg_btn_tonal)
+        btnLight.setTextColor(if (!darkNow) Color.WHITE else getColor(R.color.vault_text))
+        btnDark.setTextColor(if (darkNow) Color.WHITE else getColor(R.color.vault_text))
+        btnLight.setOnClickListener { if (Prefs.isDark(this)) { Prefs.setDark(this, false); recreate() } }
+        btnDark.setOnClickListener { if (!Prefs.isDark(this)) { Prefs.setDark(this, true); recreate() } }
         findViewById<View>(R.id.btnChangePin).setOnClickListener {
             changingPin = true
             showGate(Mode.CREATE)
