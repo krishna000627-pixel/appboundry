@@ -23,6 +23,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.widget.SeekBar
+import android.widget.FrameLayout
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.graphics.Color
@@ -140,8 +141,15 @@ class VaultActivity : Activity() {
     private val mediaAdapter = MediaAdapter()
     private var allMedia: List<MediaVault.Item> = emptyList()
     private var mediaItems: List<MediaVault.Item> = emptyList()
-    private var openFolder: Folder? = null
-    private var folderList: List<Pair<Folder, List<MediaVault.Item>>> = emptyList()
+    private data class FolderEntry(
+        val key: String,
+        val label: String,
+        val items: List<MediaVault.Item>,
+        val custom: Boolean
+    )
+
+    private var openFolder: String? = null
+    private var folderList: List<FolderEntry> = emptyList()
     private var gridShowsFolders = true
     private var folderCellH = 0
     private val folderAdapter = FolderAdapter()
@@ -735,9 +743,13 @@ class VaultActivity : Activity() {
         gvMedia.adapter = folderAdapter
         gvMedia.setOnItemClickListener { _, _, position, _ ->
             if (openFolder == null) {
-                folderList.getOrNull(position)?.let {
-                    openFolder = it.first
-                    refreshMedia()
+                if (position == folderList.size) {
+                    newFolderDialog(null)
+                } else {
+                    folderList.getOrNull(position)?.let {
+                        openFolder = it.key
+                        refreshMedia()
+                    }
                 }
                 return@setOnItemClickListener
             }
@@ -745,7 +757,10 @@ class VaultActivity : Activity() {
             if (selectMode) toggleSelected(item) else openViewer(item)
         }
         gvMedia.setOnItemLongClickListener { _, _, position, _ ->
-            if (openFolder == null) return@setOnItemLongClickListener true
+            if (openFolder == null) {
+                folderList.getOrNull(position)?.takeIf { it.custom }?.let { folderOptions(it) }
+                return@setOnItemLongClickListener true
+            }
             val item = mediaItems.getOrNull(position)
             if (item != null) {
                 selectMode = true
@@ -767,6 +782,7 @@ class VaultActivity : Activity() {
         }
         findViewById<View>(R.id.btnSelCancel).setOnClickListener { exitSelect() }
         findViewById<View>(R.id.btnSelRestore).setOnClickListener { restoreSelected() }
+        findViewById<View>(R.id.btnSelMove).setOnClickListener { moveSelected() }
         findViewById<View>(R.id.btnSelDelete).setOnClickListener { confirmDeleteSelected() }
 
         findViewById<View>(R.id.btnViewerBack).setOnClickListener { closeViewer() }
@@ -829,9 +845,9 @@ class VaultActivity : Activity() {
         tabVideos.visibility = View.GONE
         btnSort.visibility = vis
         findViewById<View>(R.id.tvMediaHint).visibility = vis
-        val f = openFolder
+        val f = folderList.firstOrNull { it.key == openFolder }
         if (f != null) {
-            tabAll.text = "\u2039  " + getString(f.labelRes) + "  " + mediaItems.size
+            tabAll.text = "\u2039  " + f.label + "  " + mediaItems.size
             styleTab(tabAll, true)
         }
     }
@@ -843,16 +859,13 @@ class VaultActivity : Activity() {
 
     private fun refreshMedia() {
         allMedia = MediaVault.list(this)
-        folderList = Folder.values().mapNotNull { f ->
-            val list = allMedia.filter { folderOf(it) == f }
-            if (list.isEmpty()) null else f to list
-        }
-        if (openFolder != null && folderList.none { it.first == openFolder }) openFolder = null
+        folderList = buildFolders()
+        if (openFolder != null && folderList.none { it.key == openFolder }) openFolder = null
         val cur = openFolder
         mediaItems = if (cur == null) {
             emptyList()
         } else {
-            val l = folderList.first { it.first == cur }.second
+            val l = folderList.first { it.key == cur }.items
             if (newestFirst) l.sortedByDescending { it.added } else l.sortedBy { it.added }
         }
         btnSort.setText(if (newestFirst) R.string.vault_sort_newest else R.string.vault_sort_oldest)
@@ -863,7 +876,9 @@ class VaultActivity : Activity() {
         val size = Formatter.formatFileSize(this, MediaVault.totalBytes(allMedia))
         tvMediaCount.text = getString(R.string.vault_media_summary, allMedia.size, size)
         tvStatusStorage.text = size
-        tvMediaEmpty.visibility = if (allMedia.isEmpty()) View.VISIBLE else View.GONE
+        val folderEmpty = openFolder != null && mediaItems.isEmpty()
+        tvMediaEmpty.visibility = if (allMedia.isEmpty() || folderEmpty) View.VISIBLE else View.GONE
+        tvMediaEmpty.setText(if (allMedia.isEmpty()) R.string.vault_media_empty else R.string.vault_folder_empty)
         tvHomeMediaCount.text = allMedia.size.toString()
         renderSelection()
 
@@ -959,22 +974,38 @@ class VaultActivity : Activity() {
 
     // -- hiding --
 
+    /** Opens the gallery photo picker (not the Files app); older phones fall back to the gallery app. */
     private fun pickMedia() {
-        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+        val options = ArrayList<Intent>()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            options.add(Intent("android.provider.action.PICK_IMAGES").apply {
+                if (Build.VERSION.SDK_INT >= 33) {
+                    putExtra("android.provider.extra.PICK_IMAGES_MAX", MediaStore.getPickImagesMaxLimit())
+                }
+            })
+        }
+        options.add(Intent(Intent.ACTION_PICK).apply {
+            setDataAndType(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, "image/*")
+            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+        })
+        options.add(Intent(Intent.ACTION_GET_CONTENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
             type = "*/*"
             putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/*", "video/*"))
             putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-        }
-        // The system picker takes the screen; do not re-lock while it is open.
+        })
+        // The picker takes the screen; do not re-lock while it is open.
         holdLockUntil = System.currentTimeMillis() + HOLD_LOCK_MS
-        try {
-            @Suppress("DEPRECATION")
-            startActivityForResult(intent, REQ_PICK)
-        } catch (e: Exception) {
-            holdLockUntil = 0L
+        for (intent in options) {
+            try {
+                @Suppress("DEPRECATION")
+                startActivityForResult(intent, REQ_PICK)
+                return
+            } catch (e: Exception) {
+            }
         }
+        holdLockUntil = 0L
+        Toast.makeText(this, R.string.vault_no_gallery, Toast.LENGTH_SHORT).show()
     }
 
     @Suppress("OVERRIDE_DEPRECATION")
@@ -990,14 +1021,16 @@ class VaultActivity : Activity() {
             } else {
                 data.data?.let { uris.add(it) }
             }
-            hideUris(uris)
+            if (uris.isNotEmpty() && !(expired && vaultRoot.visibility == View.VISIBLE)) {
+                chooseFolder(R.string.vault_folder_add_to) { target -> hideUris(uris, target) }
+            }
         } else if (requestCode == REQ_DELETE) {
             Toast.makeText(this, R.string.vault_media_originals_done, Toast.LENGTH_SHORT).show()
         }
         if (expired && vaultRoot.visibility == View.VISIBLE) showGate(Mode.UNLOCK)
     }
 
-    private fun hideUris(uris: List<Uri>) {
+    private fun hideUris(uris: List<Uri>, target: String? = null) {
         if (uris.isEmpty()) return
         btnHideMedia.isEnabled = false
         btnHideMedia.setText(R.string.vault_media_hiding)
@@ -1005,9 +1038,15 @@ class VaultActivity : Activity() {
         val allFiles = hasAllFiles()
         Thread {
             val copied = ArrayList<Uri>()
+            val newIds = ArrayList<String>()
             for (u in uris) {
-                if (MediaVault.hide(app, u) != null) copied.add(u)
+                val hidden = MediaVault.hide(app, u)
+                if (hidden != null) {
+                    copied.add(u)
+                    newIds.add(hidden.id)
+                }
             }
+            if (target != null) FolderStore.assign(app, newIds, target)
             // Remove the originals; whatever the system refuses is handled below.
             val stuck = ArrayList<Uri>()
             for (u in copied) {
@@ -1034,7 +1073,7 @@ class VaultActivity : Activity() {
             val mediaUris = ArrayList<Uri>()
             for (u in stuck) {
                 try {
-                    MediaStore.getMediaUri(this, u)?.let { mediaUris.add(it) }
+                    (MediaVault.resolveMediaUri(this, u) ?: MediaStore.getMediaUri(this, u))?.let { mediaUris.add(it) }
                 } catch (e: Exception) {
                 }
             }
@@ -1347,22 +1386,143 @@ class VaultActivity : Activity() {
             .show()
     }
 
+    private fun buildFolders(): List<FolderEntry> {
+        val assign = FolderStore.assignments(this)
+        val customNames = FolderStore.names(this)
+        val customItems = customNames.associateWith { ArrayList<MediaVault.Item>() }
+        val autoItems = Folder.values().associateWith { ArrayList<MediaVault.Item>() }
+        for (item in allMedia) {
+            val mine = assign[item.id]?.let { customItems[it] }
+            if (mine != null) mine.add(item) else autoItems.getValue(folderOf(item)).add(item)
+        }
+        val out = ArrayList<FolderEntry>()
+        for (n in customNames) out.add(FolderEntry("c:$n", n, customItems.getValue(n), true))
+        for (f in Folder.values()) {
+            val list = autoItems.getValue(f)
+            if (list.isNotEmpty()) out.add(FolderEntry("a:" + f.name, getString(f.labelRes), list, false))
+        }
+        return out
+    }
+
+    private fun nameDialog(titleRes: Int, start: String, onOk: (String) -> Unit) {
+        val input = EditText(this)
+        input.setText(start)
+        input.setSingleLine()
+        input.selectAll()
+        val box = FrameLayout(this)
+        box.setPadding(dp(20), dp(8), dp(20), 0)
+        box.addView(input)
+        AlertDialog.Builder(this)
+            .setTitle(titleRes)
+            .setView(box)
+            .setNegativeButton(R.string.vault_media_cancel, null)
+            .setPositiveButton(R.string.vault_folder_create) { _, _ -> onOk(input.text.toString().trim()) }
+            .show()
+    }
+
+    /** Makes a folder named "Folder N" (the number is filled in, the name can be changed). */
+    private fun newFolderDialog(onCreated: ((String) -> Unit)?) {
+        nameDialog(R.string.vault_folder_new, FolderStore.nextName(this)) { name ->
+            if (FolderStore.add(this, name)) {
+                refreshMedia()
+                onCreated?.invoke(name)
+            } else {
+                Toast.makeText(this, R.string.vault_folder_exists, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun folderOptions(entry: FolderEntry) {
+        val name = entry.label
+        AlertDialog.Builder(this)
+            .setTitle(name)
+            .setItems(
+                arrayOf(getString(R.string.vault_folder_rename), getString(R.string.vault_folder_remove))
+            ) { _, which ->
+                if (which == 0) {
+                    nameDialog(R.string.vault_folder_rename, name) { newName ->
+                        if (FolderStore.rename(this, name, newName)) {
+                            if (openFolder == entry.key) openFolder = "c:$newName"
+                            refreshMedia()
+                        } else {
+                            Toast.makeText(this, R.string.vault_folder_exists, Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                } else {
+                    AlertDialog.Builder(this)
+                        .setTitle(R.string.vault_folder_remove_title)
+                        .setMessage(R.string.vault_folder_remove_msg)
+                        .setNegativeButton(R.string.vault_media_cancel, null)
+                        .setPositiveButton(R.string.vault_folder_remove) { _, _ ->
+                            FolderStore.remove(this, name)
+                            if (openFolder == entry.key) openFolder = null
+                            refreshMedia()
+                        }
+                        .show()
+                }
+            }
+            .show()
+    }
+
+    /** Lists the user's folders (and "new folder"); [onPick] gets the folder name, or null for automatic. */
+    private fun chooseFolder(titleRes: Int, onPick: (String?) -> Unit) {
+        val names = FolderStore.names(this)
+        val labels = ArrayList<String>()
+        labels.add(getString(R.string.vault_folder_auto))
+        labels.addAll(names)
+        labels.add(getString(R.string.vault_folder_new_item))
+        AlertDialog.Builder(this)
+            .setTitle(titleRes)
+            .setItems(labels.toTypedArray()) { _, which ->
+                when {
+                    which == 0 -> onPick(null)
+                    which <= names.size -> onPick(names[which - 1])
+                    else -> newFolderDialog { created -> onPick(created) }
+                }
+            }
+            .show()
+    }
+
+    private fun moveSelected() {
+        val ids = selected.toList()
+        if (ids.isEmpty()) return
+        chooseFolder(R.string.vault_folder_move_to) { target ->
+            FolderStore.assign(this, ids, target)
+            exitSelect()
+            refreshMedia()
+            Toast.makeText(this, getString(R.string.vault_folder_moved, ids.size), Toast.LENGTH_SHORT).show()
+        }
+    }
+
     private inner class FolderAdapter : BaseAdapter() {
-        override fun getCount(): Int = folderList.size
-        override fun getItem(position: Int): Any = folderList[position]
+        override fun getCount(): Int = folderList.size + 1
+        override fun getItem(position: Int): Any = position
         override fun getItemId(position: Int): Long = position.toLong()
 
         override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
             val v = convertView ?: layoutInflater.inflate(R.layout.cell_folder, parent, false)
             v.layoutParams = AbsListView.LayoutParams(AbsListView.LayoutParams.MATCH_PARENT, folderCellH)
-            val (folder, list) = folderList[position]
-            val first = list.maxByOrNull { it.added } ?: return v
             val iv = v.findViewById<ImageView>(R.id.ivFolderThumb)
-            iv.tag = first.id
+            val tvName = v.findViewById<TextView>(R.id.tvFolderName)
+            val tvCount = v.findViewById<TextView>(R.id.tvFolderCount)
             iv.setImageDrawable(null)
-            v.findViewById<TextView>(R.id.tvFolderName).text = getString(folder.labelRes)
-            v.findViewById<TextView>(R.id.tvFolderCount).text =
-                list.size.toString() + "  \u00B7  " + Formatter.formatFileSize(this@VaultActivity, MediaVault.totalBytes(list))
+            val entry = folderList.getOrNull(position)
+            if (entry == null) {
+                iv.tag = ""
+                tvName.text = "+  " + getString(R.string.vault_folder_new)
+                tvCount.setText(R.string.vault_folder_new_hint)
+                return v
+            }
+            tvName.text = entry.label
+            val first = entry.items.maxByOrNull { it.added }
+            if (first == null) {
+                iv.tag = ""
+                tvCount.text = "0"
+                return v
+            }
+            iv.tag = first.id
+            tvCount.text = entry.items.size.toString() + "  \u00B7  " +
+                Formatter.formatFileSize(this@VaultActivity, MediaVault.totalBytes(entry.items))
             MediaVault.thumb(first, folderCellH * 2) { bmp: Bitmap? ->
                 if (iv.tag == first.id && bmp != null) iv.setImageBitmap(bmp)
             }

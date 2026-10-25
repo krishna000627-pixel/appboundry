@@ -222,9 +222,35 @@ object MediaVault {
      * Removes the original of a picked file from the gallery. Tries the document provider first;
      * with all-files access it can also delete through MediaStore or the file path directly.
      */
+    /** Gallery-picker links point at the same id as the MediaStore row; this finds that row. */
+    fun resolveMediaUri(context: Context, uri: Uri): Uri? {
+        if (uri.authority != "media") return null
+        if (!uri.pathSegments.contains("picker")) return uri
+        val id = uri.lastPathSegment?.toLongOrNull() ?: return null
+        val type = try {
+            context.applicationContext.contentResolver.getType(uri) ?: ""
+        } catch (e: Exception) {
+            ""
+        }
+        val base = if (type.startsWith("video/")) {
+            MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+        } else {
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+        }
+        return ContentUris.withAppendedId(base, id)
+    }
+
     fun deleteOriginal(context: Context, uri: Uri, allFiles: Boolean): Boolean {
         val app = context.applicationContext
         val cr = app.contentResolver
+        val mediaUri = resolveMediaUri(app, uri)
+        if (mediaUri != null) {
+            return try {
+                cr.delete(mediaUri, null, null) > 0
+            } catch (e: Exception) {
+                false
+            }
+        }
         try {
             if (DocumentsContract.deleteDocument(cr, uri)) return true
         } catch (e: Exception) {

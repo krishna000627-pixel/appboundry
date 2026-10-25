@@ -169,5 +169,21 @@
     <string name="vault_folder_other">Other photos</string>
     <string name="vault_folder_videos">Videos</string>
     <string name="vault_sec_hide_title">Add photos &amp; videos</string>
-    <string name="vault_sec_hide_desc">Pick photos and videos to hide in the vault. This is the only place to add them.</string>
+    <string name="vault_sec_hide_desc">Pick photos and videos from your gallery to hide them here, and choose which folder they go into. This is the only place to add them.</string>
+    <string name="vault_folder_new">New folder</string>
+    <string name="vault_folder_create">Create</string>
+    <string name="vault_folder_exists">That name is empty or already used</string>
+    <string name="vault_folder_auto">Automatic (by type)</string>
+    <string name="vault_folder_new_item">+  New folder\u2026</string>
+    <string name="vault_folder_add_to">Add to folder</string>
+    <string name="vault_folder_move_to">Move to folder</string>
+    <string name="vault_folder_rename">Rename</string>
+    <string name="vault_folder_remove">Delete folder</string>
+    <string name="vault_folder_remove_title">Delete this folder?</string>
+    <string name="vault_folder_remove_msg">Photos inside are kept and go back to their automatic folders.</string>
+    <string name="vault_folder_empty">This folder is empty.\nOpen another folder, select photos and use Move.</string>
+    <string name="vault_folder_new_hint">Numbered automatically</string>
+    <string name="vault_folder_moved">Moved %1$d</string>
+    <string name="vault_sel_move">Move</string>
+    <string name="vault_no_gallery">No gallery app found</string>
 </resources>
