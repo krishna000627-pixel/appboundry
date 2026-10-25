@@ -1228,13 +1228,11 @@ class VaultActivity : Activity() {
         viewing = item
         viewIndex = idx
         viewerCount = mediaItems.size
-        viewerLayer.animate().cancel()
-        viewerLayer.alpha = 0f
+        viewerLayer.alpha = 1f
         viewerLayer.visibility = View.VISIBLE
         enterFullScreen()
         setControls(true, false)
         pager.open(idx)
-        viewerLayer.animate().alpha(1f).setDuration(160).start()
     }
 
     private fun bindViewerPage(page: MediaPager.Page, index: Int) {
@@ -1310,41 +1308,30 @@ class VaultActivity : Activity() {
     }
 
     /** Controls showing: the picture is reduced to the space between the bars. Hidden: it fills the page. */
-    private var pagerAnim: android.animation.ValueAnimator? = null
-
+    /** Controls showing: the picture is reduced to the space between the bars. Hidden: it fills the page. */
     private fun fitPager(animate: Boolean, retry: Boolean = true) {
-        var top = 0
-        var bottom = 0
+        var scale = 1f
+        var ty = 0f
         if (controlsVisible) {
-            top = viewerTop.height
-            bottom = viewerBottom.height
-            if (top <= 0 || bottom <= 0) {
+            val h = pager.height
+            val top = viewerTop.height
+            val bottom = viewerBottom.height
+            if (h <= 0 || top <= 0 || bottom <= 0) {
                 if (retry) viewerLayer.post { fitPager(false, false) }
                 return
             }
+            scale = ((h - top - bottom).toFloat() / h).coerceIn(0.3f, 1f)
+            ty = (top - bottom) / 2f
         }
-        btnPlay.translationY = (top - bottom) / 2f
-        val lp = pager.layoutParams as FrameLayout.LayoutParams
-        if (lp.topMargin == top && lp.bottomMargin == bottom) return
-        pagerAnim?.cancel()
-        if (!animate) {
-            lp.topMargin = top
-            lp.bottomMargin = bottom
-            pager.layoutParams = lp
-            return
+        pager.animate().cancel()
+        if (animate) {
+            pager.animate().scaleX(scale).scaleY(scale).translationY(ty).setDuration(180).start()
+        } else {
+            pager.scaleX = scale
+            pager.scaleY = scale
+            pager.translationY = ty
         }
-        val t0 = lp.topMargin
-        val b0 = lp.bottomMargin
-        pagerAnim = android.animation.ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = 180
-            addUpdateListener {
-                val f = it.animatedValue as Float
-                lp.topMargin = (t0 + (top - t0) * f).toInt()
-                lp.bottomMargin = (b0 + (bottom - b0) * f).toInt()
-                pager.layoutParams = lp
-            }
-            start()
-        }
+        btnPlay.translationY = ty
     }
 
     private fun isPlayingVideo(): Boolean {
@@ -1445,8 +1432,6 @@ class VaultActivity : Activity() {
         pager.scaleY = 1f
         pager.translationY = 0f
         btnPlay.translationY = 0f
-        pagerAnim?.cancel()
-        (pager.layoutParams as FrameLayout.LayoutParams).let { it.topMargin = 0; it.bottomMargin = 0; pager.layoutParams = it }
         exitFullScreen()
     }
 
