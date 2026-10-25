@@ -17,6 +17,9 @@
         <item name="android:textColorPrimary">@color/vault_text</item>
     </style>
 
+    <!-- Base for the dotted Vault.* styles below (a dotted name implies this parent). -->
+    <style name="Vault" />
+
     <style name="Vault.Card">
         <item name="android:background">@drawable/bg_vault_card</item>
         <item name="android:padding">18dp</item>
