@@ -4,6 +4,9 @@
     <!-- All files access: lets the vault delete originals directly and restore files. Asked from inside the vault. -->
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
 
+    <!-- Short buzz when the blocker screen is unlocked. Normal permission, no prompt. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
     <!-- Needed to resolve app names/icons for the blocked list and the app picker (API 30+). -->
     <queries>
         <package android:name="com.instagram.android" />

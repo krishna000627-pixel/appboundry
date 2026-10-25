@@ -10,6 +10,9 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
@@ -45,13 +48,17 @@ class AlertActivity : Activity() {
     private var downAt = 0L
     private var multiTouch = false
 
+    // Gestures only count when the whole touch happened on this screen, after it settled.
+    private var readyAt = 0L
+    private var gestureOk = false
+
     // Ways 2 and 3: codes.
     private val volumeMatcher = Matcher()
     private val cornerMatcher = Matcher()
 
     // Way 4: two fingers held on the black area.
     private val handler = Handler(Looper.getMainLooper())
-    private val twoFingerUnlock = Runnable { unlockNow() }
+    private val twoFingerUnlock = Runnable { if (isReady() && gestureOk && multiTouch) unlockNow() }
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -66,7 +73,7 @@ class AlertActivity : Activity() {
 
         // Way 1, part 2: press and hold the box (not the OK button).
         findViewById<View>(R.id.card).setOnLongClickListener {
-            if (Prefs.unlockEnabled(this, Prefs.METHOD_TAP_HOLD) && isArmed()) {
+            if (isReady() && Prefs.unlockEnabled(this, Prefs.METHOD_TAP_HOLD) && isArmed()) {
                 unlockNow()
                 true
             } else {
@@ -92,6 +99,7 @@ class AlertActivity : Activity() {
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) {
+            readyAt = SystemClock.elapsedRealtime() + SETTLE_MS
             hideSystemBars()
             // This black screen is now visible, so the instant cover is no longer needed.
             BoundaryAccessibilityService.instance?.hideCover()
@@ -100,7 +108,7 @@ class AlertActivity : Activity() {
 
     // Way 2: volume code. Volume still works normally while the code is typed.
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        if (event.repeatCount == 0 && Prefs.unlockEnabled(this, Prefs.METHOD_VOLUME)) {
+        if (event.repeatCount == 0 && isReady() && Prefs.unlockEnabled(this, Prefs.METHOD_VOLUME)) {
             val symbol = when (keyCode) {
                 KeyEvent.KEYCODE_VOLUME_UP -> 'U'
                 KeyEvent.KEYCODE_VOLUME_DOWN -> 'D'
@@ -119,6 +127,12 @@ class AlertActivity : Activity() {
         goHomeAndFinish()
     }
 
+    /** Covered or left: nothing started here may finish later (a held finger must never unlock). */
+    override fun onStop() {
+        resetGestures()
+        super.onStop()
+    }
+
     override fun onDestroy() {
         handler.removeCallbacks(twoFingerUnlock)
         isShowing = false
@@ -133,14 +147,25 @@ class AlertActivity : Activity() {
         targetPackage = intent.getStringExtra(EXTRA_PACKAGE)
         preview = intent.getBooleanExtra(EXTRA_PREVIEW, false)
         label = resolveLabel(targetPackage)
-        taps = 0
-        volumeMatcher.progress = 0
-        cornerMatcher.progress = 0
+        resetGestures()
+        readyAt = SystemClock.elapsedRealtime() + SETTLE_MS
         tvTitle.text = Prefs.alertTitle(this) ?: getString(R.string.alert_title)
         tvMessage.text = Prefs.alertMessage(this)?.replace("{app}", label)
             ?: getString(R.string.alert_message, label)
         btnPositive.setText(R.string.alert_ok)
     }
+
+    private fun resetGestures() {
+        handler.removeCallbacks(twoFingerUnlock)
+        taps = 0
+        multiTouch = false
+        gestureOk = false
+        volumeMatcher.progress = 0
+        cornerMatcher.progress = 0
+    }
+
+    /** False for a moment after the screen appears, so touches left over from opening the app are ignored. */
+    private fun isReady(): Boolean = SystemClock.elapsedRealtime() >= readyAt
 
     // ---- Touch: tap counting, corner code, two-finger hold ------------------
 
@@ -149,10 +174,13 @@ class AlertActivity : Activity() {
             MotionEvent.ACTION_DOWN -> {
                 downAt = event.eventTime
                 multiTouch = false
+                gestureOk = isReady() // a touch that starts too early is ignored until all fingers lift
             }
             MotionEvent.ACTION_POINTER_DOWN -> {
                 multiTouch = true
-                if (event.pointerCount == 2 && Prefs.unlockEnabled(this, Prefs.METHOD_TWO_FINGER)) {
+                if (gestureOk && event.pointerCount == 2 &&
+                    Prefs.unlockEnabled(this, Prefs.METHOD_TWO_FINGER)
+                ) {
                     handler.postDelayed(twoFingerUnlock, TWO_FINGER_HOLD_MS)
                 }
             }
@@ -160,11 +188,13 @@ class AlertActivity : Activity() {
             MotionEvent.ACTION_CANCEL -> {
                 handler.removeCallbacks(twoFingerUnlock)
                 multiTouch = false
+                gestureOk = false
             }
             MotionEvent.ACTION_UP -> {
                 handler.removeCallbacks(twoFingerUnlock)
-                if (!multiTouch && event.eventTime - downAt < TAP_MAX_MS) onBackgroundTap(v, event)
+                if (gestureOk && !multiTouch && event.eventTime - downAt < TAP_MAX_MS) onBackgroundTap(v, event)
                 multiTouch = false
+                gestureOk = false
             }
         }
     }
@@ -214,12 +244,29 @@ class AlertActivity : Activity() {
 
     private fun unlockNow() {
         closedByUser = true
+        vibrateUnlock() // every unlock method ends here, so each one gets the same buzz
         if (preview) {
             returnToVault()
             return
         }
         BoundaryAccessibilityService.grantSession(targetPackage)
         finish()
+    }
+
+    private fun vibrateUnlock() {
+        try {
+            val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                getSystemService(VibratorManager::class.java)?.defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+            }
+            vibrator?.vibrate(
+                VibrationEffect.createOneShot(UNLOCK_VIBRATION_MS, VibrationEffect.DEFAULT_AMPLITUDE)
+            )
+        } catch (e: Exception) {
+            // No vibrator or not allowed: the unlock still works.
+        }
     }
 
     /** Preview only: close this screen and bring the vault back instead of going home. */
@@ -279,6 +326,8 @@ class AlertActivity : Activity() {
         private const val TAP_WINDOW_MS = 2000L
         private const val ARM_WINDOW_MS = 3000L
         private const val TWO_FINGER_HOLD_MS = 1500L
+        private const val SETTLE_MS = 500L
+        private const val UNLOCK_VIBRATION_MS = 60L
 
         /** True while an alert exists, so the service never launches a second one. */
         @Volatile
