@@ -8,6 +8,9 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.MediaStore
 import android.view.WindowManager
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
 import android.widget.AbsListView
 import android.widget.GridView
 import android.widget.MediaController
@@ -24,7 +27,6 @@ import android.os.Handler
 import android.os.Looper
 import android.widget.SeekBar
 import android.widget.FrameLayout
-import android.widget.HorizontalScrollView
 import android.view.animation.DecelerateInterpolator
 import android.view.WindowInsets
 import android.view.WindowInsetsController
@@ -631,7 +633,7 @@ class VaultActivity : Activity() {
         val sp = getSharedPreferences("appboundary_media", MODE_PRIVATE)
         if (sp.getBoolean("asked_all_files", false)) return
         sp.edit().putBoolean("asked_all_files", true).apply()
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, R.style.Vault_Dialog)
             .setTitle(R.string.vault_files_ask_title)
             .setMessage(R.string.vault_files_desc)
             .setNegativeButton(R.string.vault_files_later, null)
@@ -678,7 +680,7 @@ class VaultActivity : Activity() {
         // Blocked apps
         findViewById<View>(R.id.btnRemoveAll).setOnClickListener {
             if (Prefs.targets(this).isEmpty()) return@setOnClickListener
-            AlertDialog.Builder(this)
+            AlertDialog.Builder(this, R.style.Vault_Dialog)
                 .setTitle(R.string.vault_remove_all_title)
                 .setMessage(R.string.vault_remove_all_msg)
                 .setNegativeButton(R.string.vault_media_cancel, null)
@@ -716,7 +718,7 @@ class VaultActivity : Activity() {
                 Toast.makeText(this, R.string.vault_media_empty_short, Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-            AlertDialog.Builder(this)
+            AlertDialog.Builder(this, R.style.Vault_Dialog)
                 .setTitle(R.string.vault_wipe_title)
                 .setMessage(getString(R.string.vault_wipe_msg, n))
                 .setNegativeButton(R.string.vault_media_cancel, null)
@@ -777,7 +779,7 @@ class VaultActivity : Activity() {
             }
             true
         }
-        btnHideMedia.setOnClickListener { pickMedia() }
+        btnHideMedia.setOnClickListener { addDialog() }
         tabAll.setOnClickListener { closeFolder() }
         btnSort.setOnClickListener {
             newestFirst = !newestFirst
@@ -881,6 +883,7 @@ class VaultActivity : Activity() {
         }
         btnSort.setText(if (newestFirst) R.string.vault_sort_newest else R.string.vault_sort_oldest)
         renderMediaMode()
+        mediaAdapter.notifyDataSetChanged()
         selected.retainAll(allMedia.map { it.id }.toSet())
         syncViewer()
 
@@ -936,7 +939,32 @@ class VaultActivity : Activity() {
     private fun renderSelection() {
         llSelectBar.visibility = if (selectMode) View.VISIBLE else View.GONE
         tvSelCount.text = getString(R.string.vault_sel_count, selected.size)
-        mediaAdapter.notifyDataSetChanged()
+        syncVisibleCells()
+    }
+
+    /** Only repaints the check marks of the cells on screen; thumbnails are never touched. */
+    private fun syncVisibleCells() {
+        if (openFolder == null) return
+        val first = gvMedia.firstVisiblePosition
+        for (i in 0 until gvMedia.childCount) {
+            val item = mediaItems.getOrNull(first + i) ?: continue
+            bindCellState(gvMedia.getChildAt(i), item, true)
+        }
+    }
+
+    private fun bindCellState(v: View, item: MediaVault.Item, animate: Boolean) {
+        val picked = selectMode && selected.contains(item.id)
+        v.findViewById<View>(R.id.vSelect).visibility = if (picked) View.VISIBLE else View.GONE
+        val check = v.findViewById<TextView>(R.id.tvCheck)
+        check.visibility = if (selectMode) View.VISIBLE else View.GONE
+        check.setBackgroundResource(if (picked) R.drawable.bg_check_circle else R.drawable.bg_check_ring)
+        check.text = if (picked) getString(R.string.vault_media_check) else ""
+        val sc = if (picked) 0.9f else 1f
+        if (animate) v.animate().scaleX(sc).scaleY(sc).setDuration(90).start() else {
+            v.animate().cancel()
+            v.scaleX = sc
+            v.scaleY = sc
+        }
     }
 
     private fun exitSelect() {
@@ -970,7 +998,7 @@ class VaultActivity : Activity() {
     private fun confirmDeleteSelected() {
         val items = allMedia.filter { it.id in selected }
         if (items.isEmpty()) return
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, R.style.Vault_Dialog)
             .setTitle(R.string.vault_media_delete_title)
             .setMessage(R.string.vault_media_delete_msg)
             .setNegativeButton(R.string.vault_media_cancel, null)
@@ -985,14 +1013,40 @@ class VaultActivity : Activity() {
 
     // -- hiding --
 
+    /** "Add" button: choose between the gallery picker and the file browser; both allow many at once. */
+    private fun addDialog() {
+        AlertDialog.Builder(this, R.style.Vault_Dialog)
+            .setTitle(R.string.vault_add_title)
+            .setItems(arrayOf(getString(R.string.vault_add_gallery), getString(R.string.vault_add_files))) { _, which ->
+                if (which == 0) pickMedia() else pickFiles()
+            }
+            .show()
+    }
+
+    private fun pickFiles() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/*", "video/*"))
+            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+        }
+        holdLockUntil = System.currentTimeMillis() + HOLD_LOCK_MS
+        try {
+            @Suppress("DEPRECATION")
+            startActivityForResult(intent, REQ_PICK)
+        } catch (e: Exception) {
+            holdLockUntil = 0L
+            Toast.makeText(this, R.string.vault_no_gallery, Toast.LENGTH_SHORT).show()
+        }
+    }
+
     /** Opens the gallery photo picker (not the Files app); older phones fall back to the gallery app. */
     private fun pickMedia() {
         val options = ArrayList<Intent>()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             options.add(Intent("android.provider.action.PICK_IMAGES").apply {
-                if (Build.VERSION.SDK_INT >= 33) {
-                    putExtra("android.provider.extra.PICK_IMAGES_MAX", MediaStore.getPickImagesMaxLimit())
-                }
+                val max = if (Build.VERSION.SDK_INT >= 33) MediaStore.getPickImagesMaxLimit() else 100
+                putExtra("android.provider.extra.PICK_IMAGES_MAX", max)
             })
         }
         options.add(Intent(Intent.ACTION_PICK).apply {
@@ -1050,12 +1104,30 @@ class VaultActivity : Activity() {
         Thread {
             val copied = ArrayList<Uri>()
             val newIds = ArrayList<String>()
-            for (u in uris) {
-                val hidden = MediaVault.hide(app, u)
-                if (hidden != null) {
-                    copied.add(u)
-                    newIds.add(hidden.id)
+            val results = arrayOfNulls<MediaVault.Item>(uris.size)
+            val pool = Executors.newFixedThreadPool(3)
+            val done = AtomicInteger(0)
+            val latch = CountDownLatch(uris.size)
+            uris.forEachIndexed { i, u ->
+                pool.execute {
+                    try {
+                        results[i] = MediaVault.hide(app, u)
+                    } catch (e: Exception) {
+                    } finally {
+                        val n = done.incrementAndGet()
+                        runOnUiThread {
+                            if (!isDestroyed) btnHideMedia.text = getString(R.string.vault_media_hiding_n, n, uris.size)
+                        }
+                        latch.countDown()
+                    }
                 }
+            }
+            latch.await()
+            pool.shutdown()
+            for (i in uris.indices) {
+                val hidden = results[i] ?: continue
+                copied.add(uris[i])
+                newIds.add(hidden.id)
             }
             if (target != null) FolderStore.assign(app, newIds, target)
             // Remove the originals; whatever the system refuses is handled below.
@@ -1122,11 +1194,13 @@ class VaultActivity : Activity() {
         viewing = item
         viewIndex = idx
         viewerCount = mediaItems.size
-        viewerLayer.alpha = 1f
+        viewerLayer.animate().cancel()
+        viewerLayer.alpha = 0f
         viewerLayer.visibility = View.VISIBLE
         enterFullScreen()
-        setControls(true, false)
+        setControls(item.video, false)
         pager.open(idx)
+        viewerLayer.animate().alpha(1f).setDuration(160).start()
     }
 
     private fun bindViewerPage(page: MediaPager.Page, index: Int) {
@@ -1203,19 +1277,9 @@ class VaultActivity : Activity() {
 
     /** Controls showing: the picture is reduced to the space between the bars. Hidden: it fills the page. */
     private fun fitPager(animate: Boolean, retry: Boolean = true) {
-        var scale = 1f
-        var ty = 0f
-        if (controlsVisible) {
-            val h = pager.height
-            val top = viewerTop.height
-            val bottom = viewerBottom.height
-            if (h <= 0 || top <= 0 || bottom <= 0) {
-                if (retry) viewerLayer.post { fitPager(false, false) }
-                return
-            }
-            scale = ((h - top - bottom).toFloat() / h).coerceIn(0.3f, 1f)
-            ty = (top - bottom) / 2f
-        }
+        // The picture always fills the page; the bars float over it and fade in and out.
+        val scale = 1f
+        val ty = 0f
         pager.animate().cancel()
         if (animate) {
             pager.animate().scaleX(scale).scaleY(scale).translationY(ty).setDuration(180).start()
@@ -1314,6 +1378,7 @@ class VaultActivity : Activity() {
     private fun closeViewer() {
         if (!::viewerLayer.isInitialized) return
         stopVideoUi()
+        viewerLayer.animate().cancel()
         viewing = null
         viewIndex = -1
         pager.release()
@@ -1388,7 +1453,7 @@ class VaultActivity : Activity() {
 
     private fun confirmDeleteViewing() {
         val item = viewing ?: return
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, R.style.Vault_Dialog)
             .setTitle(R.string.vault_media_delete_title)
             .setMessage(R.string.vault_media_delete_msg)
             .setNegativeButton(R.string.vault_media_cancel, null)
@@ -1422,48 +1487,24 @@ class VaultActivity : Activity() {
         input.setText(start)
         input.setSingleLine()
         input.selectAll()
+        input.setBackgroundResource(R.drawable.bg_input)
+        input.setTextColor(getColor(R.color.vault_text))
+        input.setHintTextColor(getColor(R.color.vault_text_dim))
+        input.textSize = 16f
+        input.setPadding(dp(16), dp(14), dp(16), dp(14))
         val box = LinearLayout(this)
         box.orientation = LinearLayout.VERTICAL
-        box.setPadding(dp(20), dp(8), dp(20), 0)
+        box.setPadding(dp(22), dp(8), dp(22), dp(4))
         box.addView(input)
-        val recents = FolderStore.recent(this).filter { !it.equals(start, true) }
-        if (recents.isNotEmpty()) {
-            val label = TextView(this)
-            label.setText(R.string.vault_folder_recent)
-            label.textSize = 12f
-            label.setTextColor(getColor(R.color.vault_text_dim))
-            label.setPadding(0, dp(14), 0, dp(6))
-            box.addView(label)
-            val scroll = HorizontalScrollView(this)
-            scroll.isHorizontalScrollBarEnabled = false
-            val chips = LinearLayout(this)
-            for (name in recents) {
-                val chip = TextView(this)
-                chip.text = name
-                chip.textSize = 13f
-                chip.setTextColor(getColor(R.color.vault_text))
-                chip.setBackgroundResource(R.drawable.bg_btn_tonal)
-                chip.setPadding(dp(14), dp(8), dp(14), dp(8))
-                chip.setOnClickListener {
-                    input.setText(name)
-                    input.setSelection(name.length)
-                }
-                val lp = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                )
-                lp.marginEnd = dp(8)
-                chips.addView(chip, lp)
-            }
-            scroll.addView(chips)
-            box.addView(scroll)
-        }
-        AlertDialog.Builder(this)
+        val dlg = AlertDialog.Builder(this, R.style.Vault_Dialog)
             .setTitle(titleRes)
             .setView(box)
             .setNegativeButton(R.string.vault_media_cancel, null)
             .setPositiveButton(R.string.vault_folder_create) { _, _ -> onOk(input.text.toString().trim()) }
-            .show()
+            .create()
+        dlg.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE)
+        dlg.show()
+        input.requestFocus()
     }
 
     // -- "Add to folder" sheet on the picture page --
@@ -1537,7 +1578,7 @@ class VaultActivity : Activity() {
 
     private fun folderOptions(entry: FolderEntry) {
         val name = entry.label
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, R.style.Vault_Dialog)
             .setTitle(name)
             .setItems(
                 arrayOf(getString(R.string.vault_folder_rename), getString(R.string.vault_folder_remove))
@@ -1552,7 +1593,7 @@ class VaultActivity : Activity() {
                         }
                     }
                 } else {
-                    AlertDialog.Builder(this)
+                    AlertDialog.Builder(this, R.style.Vault_Dialog)
                         .setTitle(R.string.vault_folder_remove_title)
                         .setMessage(R.string.vault_folder_remove_msg)
                         .setNegativeButton(R.string.vault_media_cancel, null)
@@ -1574,7 +1615,7 @@ class VaultActivity : Activity() {
         labels.add(getString(R.string.vault_folder_auto))
         labels.addAll(names)
         labels.add(getString(R.string.vault_folder_new_item))
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, R.style.Vault_Dialog)
             .setTitle(titleRes)
             .setItems(labels.toTypedArray()) { _, which ->
                 when {
@@ -1646,22 +1687,20 @@ class VaultActivity : Activity() {
 
         override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
             val v = convertView ?: layoutInflater.inflate(R.layout.cell_media, parent, false)
-            v.layoutParams = AbsListView.LayoutParams(AbsListView.LayoutParams.MATCH_PARENT, cellPx)
+            val lp = v.layoutParams
+            if (lp == null || lp.height != cellPx) {
+                v.layoutParams = AbsListView.LayoutParams(AbsListView.LayoutParams.MATCH_PARENT, cellPx)
+            }
             val iv = v.findViewById<ImageView>(R.id.ivThumb)
             val item = mediaItems[position]
-            iv.tag = item.id
-            iv.setImageDrawable(null)
             v.findViewById<View>(R.id.tvPlay).visibility = if (item.video) View.VISIBLE else View.GONE
-            val picked = selectMode && selected.contains(item.id)
-            v.findViewById<View>(R.id.vSelect).visibility = if (picked) View.VISIBLE else View.GONE
-            val check = v.findViewById<TextView>(R.id.tvCheck)
-            check.visibility = if (selectMode) View.VISIBLE else View.GONE
-            check.setBackgroundResource(if (picked) R.drawable.bg_check_circle else R.drawable.bg_check_ring)
-            check.text = if (picked) getString(R.string.vault_media_check) else ""
-            v.scaleX = if (picked) 0.9f else 1f
-            v.scaleY = if (picked) 0.9f else 1f
-            MediaVault.thumb(item, cellPx) { bmp: Bitmap? ->
-                if (iv.tag == item.id && bmp != null) iv.setImageBitmap(bmp)
+            bindCellState(v, item, false)
+            if (!(iv.tag == item.id && iv.drawable != null)) {
+                iv.tag = item.id
+                iv.setImageDrawable(null)
+                MediaVault.thumb(item, cellPx) { bmp: Bitmap? ->
+                    if (iv.tag == item.id && bmp != null) iv.setImageBitmap(bmp)
+                }
             }
             return v
         }

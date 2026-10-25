@@ -11,8 +11,8 @@ android {
         applicationId = "com.appboundary"
         minSdk = 26
         targetSdk = 34
-        versionCode = 19
-        versionName = "19.0"
+        versionCode = 21
+        versionName = "21.0"
     }
 
     // Signing values come from environment variables (GitHub Actions secrets).

@@ -88,8 +88,12 @@
 
     <!-- Vault: photos and videos -->
     <string name="vault_nav_photos">Photos &amp; videos</string>
-    <string name="vault_media_hide">Hide photos &amp; videos</string>
+    <string name="vault_media_hide">Add photos &amp; videos</string>
     <string name="vault_media_hiding">Hiding...</string>
+    <string name="vault_media_hiding_n">Hiding %1$d / %2$d</string>
+    <string name="vault_add_title">Add to vault</string>
+    <string name="vault_add_gallery">Photos &amp; videos (gallery)</string>
+    <string name="vault_add_files">Browse files</string>
     <string name="vault_media_empty">Nothing hidden yet.\nAdd photos and videos from the Security page.</string>
     <string name="vault_media_count">%1$d hidden</string>
     <string name="vault_media_tile">Hidden photos &amp; videos</string>
@@ -186,7 +190,6 @@
     <string name="vault_folder_moved">Moved %1$d</string>
     <string name="vault_sel_move">Move</string>
     <string name="vault_no_gallery">No gallery app found</string>
-    <string name="vault_folder_recent">Used before</string>
     <string name="vault_folder_moved_to">Moved to %1$s</string>
     <string name="vault_folder_empty_count">Empty</string>
 </resources>

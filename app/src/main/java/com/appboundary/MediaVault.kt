@@ -48,7 +48,7 @@ object MediaVault {
     private val io = Executors.newFixedThreadPool(3)
     private val main = Handler(Looper.getMainLooper())
 
-    private val thumbs = object : LruCache<String, Bitmap>(8 * 1024) {
+    private val thumbs = object : LruCache<String, Bitmap>((Runtime.getRuntime().maxMemory() / 1024 / 6).toInt()) {
         override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount / 1024
     }
 
@@ -102,6 +102,30 @@ object MediaVault {
     // ---- Hide / restore / delete -------------------------------------------
 
     /** Copies [uri] into the vault. Returns null if the copy failed. */
+    /** Kernel-level copy (no byte buffer in the app); false means "try something else". */
+    private fun copyChannel(cr: android.content.ContentResolver, uri: Uri?, target: File): Boolean {
+        if (uri == null) return false
+        return try {
+            cr.openFileDescriptor(uri, "r")?.use { pfd ->
+                val size = pfd.statSize
+                java.io.FileInputStream(pfd.fileDescriptor).channel.use { src ->
+                    FileOutputStream(target).channel.use { dst ->
+                        val total = if (size > 0) size else src.size()
+                        var pos = 0L
+                        while (pos < total) {
+                            val n = src.transferTo(pos, total - pos, dst)
+                            if (n <= 0) break
+                            pos += n
+                        }
+                        pos == total && total > 0
+                    }
+                }
+            } ?: false
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     fun hide(context: Context, uri: Uri): Item? {
         val app = context.applicationContext
         val cr = app.contentResolver
@@ -127,14 +151,19 @@ object MediaVault {
         val fileName = if (ext.isNotEmpty()) "$id.$ext" else id
         val target = File(dir(app), fileName)
         try {
-            val input = cr.openInputStream(uri) ?: return null
-            input.use { src ->
-                FileOutputStream(target).use { dst ->
-                    val buf = ByteArray(64 * 1024)
-                    while (true) {
-                        val n = src.read(buf)
-                        if (n < 0) break
-                        dst.write(buf, 0, n)
+            // Reading straight from the media store is faster than through the photo picker's proxy.
+            val direct = try { resolveMediaUri(app, uri) } catch (e: Exception) { null }
+            if (!copyChannel(cr, direct, target) && !copyChannel(cr, uri, target)) {
+                target.delete()
+                val input = cr.openInputStream(uri) ?: return null
+                input.use { src ->
+                    FileOutputStream(target).use { dst ->
+                        val buf = ByteArray(1024 * 1024)
+                        while (true) {
+                            val n = src.read(buf)
+                            if (n < 0) break
+                            dst.write(buf, 0, n)
+                        }
                     }
                 }
             }
