@@ -54,7 +54,7 @@ object AppCache {
         context.applicationContext
             .getSharedPreferences(FILE, Context.MODE_PRIVATE)
             .edit()
-            .putString(KEY_LABELS, JSONObject(labels).toString())
+            .putString(KEY_LABELS, JSONObject(labels as Map<*, *>).toString())
             .apply()
     }
 
