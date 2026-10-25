@@ -9,10 +9,10 @@ android {
 
     defaultConfig {
         applicationId = "com.appboundary"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 34
-        versionCode = 7
-        versionName = "7.0"
+        versionCode = 8
+        versionName = "8.0"
     }
 
     // Signing values come from environment variables (GitHub Actions secrets).

@@ -8,4 +8,53 @@
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowAnimationStyle">@null</item>
     </style>
+
+    <!-- Vault: dark, calm, edge to edge colors. -->
+    <style name="Theme.AppBoundary.Vault" parent="@android:style/Theme.DeviceDefault.NoActionBar">
+        <item name="android:windowBackground">@color/vault_bg</item>
+        <item name="android:statusBarColor">@color/vault_bg</item>
+        <item name="android:navigationBarColor">@color/vault_bg</item>
+        <item name="android:textColorPrimary">@color/vault_text</item>
+    </style>
+
+    <style name="Vault.Card">
+        <item name="android:background">@drawable/bg_vault_card</item>
+        <item name="android:padding">18dp</item>
+    </style>
+
+    <style name="Vault.CardTitle">
+        <item name="android:textColor">@color/vault_text</item>
+        <item name="android:textSize">17sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="Vault.Body">
+        <item name="android:textColor">@color/vault_text_dim</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:lineSpacingMultiplier">1.15</item>
+    </style>
+
+    <style name="Vault.Button">
+        <item name="android:gravity">center</item>
+        <item name="android:paddingStart">20dp</item>
+        <item name="android:paddingEnd">20dp</item>
+        <item name="android:textColor">@color/vault_text</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:background">@drawable/bg_btn_tonal</item>
+    </style>
+
+    <style name="Vault.Button.Primary">
+        <item name="android:background">@drawable/bg_btn_primary</item>
+    </style>
+
+    <style name="Vault.Input">
+        <item name="android:background">@drawable/bg_input</item>
+        <item name="android:padding">14dp</item>
+        <item name="android:textColor">@color/vault_text</item>
+        <item name="android:textColorHint">@color/vault_text_dim</item>
+        <item name="android:textSize">15sp</item>
+    </style>
 </resources>

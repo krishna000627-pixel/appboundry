@@ -2,10 +2,61 @@
 <resources>
     <string name="app_name">AppBoundary</string>
     <string name="tile_label">App Boundary</string>
+    <string name="tile_on">On</string>
+    <string name="tile_off">Off</string>
+
+    <!-- Blocker alert (defaults; the vault can override title and message). -->
     <string name="alert_title">App Not Supported</string>
-    <!-- Customize this message freely. %1$s is replaced with the target app name. -->
     <string name="alert_message">%1$s is no longer compatible with your device architecture or system version.</string>
     <string name="alert_ok">OK</string>
     <string name="fallback_app_name">This app</string>
     <string name="service_description">Detects when a restricted app is opened and shows a focus alert. Enable it in Accessibility settings, then toggle it from Quick Settings.</string>
+
+    <!-- Vault -->
+    <string name="vault_label">Vault</string>
+    <string name="vault_title">Vault</string>
+    <string name="vault_subtitle">Private settings for AppBoundary</string>
+    <string name="vault_lock">Lock</string>
+    <string name="vault_backspace">Delete</string>
+
+    <string name="vault_pin_enter_title">Enter PIN</string>
+    <string name="vault_pin_enter_sub">Your vault is locked</string>
+    <string name="vault_pin_create_title">Create a PIN</string>
+    <string name="vault_pin_create_sub">Choose 4 digits to protect your vault</string>
+    <string name="vault_pin_confirm_title">Confirm PIN</string>
+    <string name="vault_pin_confirm_sub">Enter the same 4 digits again</string>
+    <string name="vault_pin_wrong">Wrong PIN, try again</string>
+    <string name="vault_pin_mismatch">PINs did not match. Start again</string>
+    <string name="vault_pin_locked">Too many attempts. Try again in %1$d s</string>
+    <string name="vault_pin_forgot">Forgot your PIN? Clear this app data in system settings to reset it.</string>
+    <string name="vault_pin_changed">PIN updated</string>
+
+    <string name="vault_focus_title">Focus mode</string>
+    <string name="vault_focus_on">Active. Blocked apps are covered.</string>
+    <string name="vault_focus_off">Paused. Nothing is blocked.</string>
+
+    <string name="vault_access_off">Accessibility service is off. AppBoundary cannot see when a blocked app opens.</string>
+    <string name="vault_access_fix">Open settings</string>
+
+    <string name="vault_blocked_title">Blocked apps</string>
+    <string name="vault_blocked_empty">No apps blocked yet.</string>
+    <string name="vault_add_app">Add app</string>
+    <string name="vault_no_apps">No other apps found</string>
+
+    <string name="vault_alert_title">Alert screen</string>
+    <string name="vault_alert_hint">Leave a field empty to use the default. Write {app} where the app name should appear.</string>
+    <string name="vault_preview">Preview</string>
+    <string name="vault_save">Save</string>
+    <string name="vault_reset">Reset</string>
+    <string name="vault_saved">Saved</string>
+    <string name="vault_hint_title">Title</string>
+
+    <string name="vault_unlock_title">Quick unlock</string>
+    <string name="vault_unlock_desc">On the blocker screen, tap the black area outside the box this many times, then press and hold the box.</string>
+    <string name="vault_taps">Taps</string>
+
+    <string name="vault_security_title">Security</string>
+    <string name="vault_change_pin">Change PIN</string>
+    <string name="vault_footer">AppBoundary v%1$s</string>
+    <string name="vault_remove">Remove</string>
 </resources>

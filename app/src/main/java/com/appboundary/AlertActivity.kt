@@ -92,8 +92,9 @@ class AlertActivity : Activity() {
         targetPackage = intent.getStringExtra(EXTRA_PACKAGE)
         label = resolveLabel(targetPackage)
         taps = 0
-        tvTitle.setText(R.string.alert_title)
-        tvMessage.text = getString(R.string.alert_message, label)
+        tvTitle.text = Prefs.alertTitle(this) ?: getString(R.string.alert_title)
+        tvMessage.text = Prefs.alertMessage(this)?.replace("{app}", label)
+            ?: getString(R.string.alert_message, label)
         btnPositive.setText(R.string.alert_ok)
     }
 
@@ -105,7 +106,7 @@ class AlertActivity : Activity() {
     }
 
     private fun isArmed(): Boolean =
-        taps >= resources.getInteger(R.integer.unlock_taps) &&
+        taps >= Prefs.unlockTaps(this) &&
             SystemClock.elapsedRealtime() - lastTapAt <= ARM_WINDOW_MS
 
     private fun resolveLabel(pkg: String?): String {

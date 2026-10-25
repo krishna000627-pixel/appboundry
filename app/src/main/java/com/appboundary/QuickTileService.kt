@@ -1,8 +1,13 @@
 package com.appboundary
 
+import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 
+/**
+ * Tap = focus mode on/off. Long press = Android opens VaultActivity
+ * (it declares the QS_TILE_PREFERENCES action in the manifest).
+ */
 class QuickTileService : TileService() {
 
     override fun onStartListening() {
@@ -21,6 +26,9 @@ class QuickTileService : TileService() {
         val on = Prefs.isEnabled(this)
         tile.state = if (on) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
         tile.label = getString(R.string.tile_label)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            tile.subtitle = getString(if (on) R.string.tile_on else R.string.tile_off)
+        }
         tile.updateTile()
     }
 }
