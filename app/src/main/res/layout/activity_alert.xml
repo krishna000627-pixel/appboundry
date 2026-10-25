@@ -3,7 +3,7 @@
     android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/black">
+    android:background="@color/alert_bg">
 
     <LinearLayout
         android:id="@+id/card"
@@ -12,7 +12,7 @@
         android:layout_gravity="center"
         android:layout_marginStart="32dp"
         android:layout_marginEnd="32dp"
-        android:background="@drawable/bg_card"
+        android:background="@drawable/bg_alert_card"
         android:orientation="vertical"
         android:padding="24dp">
 
@@ -20,7 +20,7 @@
             android:id="@+id/tvTitle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textColor="#FFFFFF"
+            android:textColor="@color/alert_title"
             android:textSize="24sp" />
 
         <TextView
@@ -29,7 +29,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:lineSpacingMultiplier="1.2"
-            android:textColor="#CCCCCC"
+            android:textColor="@color/alert_message"
             android:textSize="14sp" />
 
         <LinearLayout
@@ -45,7 +45,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textAllCaps="false"
-                android:textColor="#8AB4F8" />
+                android:textColor="@color/alert_button" />
         </LinearLayout>
     </LinearLayout>
 </FrameLayout>

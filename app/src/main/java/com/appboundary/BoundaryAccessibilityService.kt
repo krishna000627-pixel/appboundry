@@ -5,7 +5,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.graphics.Color
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Handler
@@ -76,7 +75,7 @@ class BoundaryAccessibilityService : AccessibilityService() {
         if (cover != null) return
 
         val wm = getSystemService(WindowManager::class.java) ?: return
-        val view = View(this).apply { setBackgroundColor(Color.BLACK) }
+        val view = View(this).apply { setBackgroundColor(getColor(R.color.alert_bg)) }
         val params = WindowManager.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.MATCH_PARENT,
@@ -98,7 +97,7 @@ class BoundaryAccessibilityService : AccessibilityService() {
         }
     }
 
-    /** Called by AlertActivity once it is visible (it is black too, so the swap is invisible). */
+    /** Called by AlertActivity once it is visible (it has the same background, so the swap is invisible). */
     fun hideCover() {
         handler.removeCallbacks(coverTimeout)
         val view = cover ?: return

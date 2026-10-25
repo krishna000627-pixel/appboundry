@@ -87,8 +87,8 @@ class VaultActivity : Activity() {
     private lateinit var navItems: Map<Page, TextView>
 
     // Home
-    private lateinit var switchFocus: Switch
-    private lateinit var tvFocusState: TextView
+    private lateinit var switchCamouflage: Switch
+    private lateinit var tvCamouflageState: TextView
     private lateinit var cardAccess: View
     private lateinit var tvBlockedCount: TextView
     private lateinit var tvUnlockCount: TextView
@@ -130,7 +130,7 @@ class VaultActivity : Activity() {
     private lateinit var llVideoBar: View
     private lateinit var seekVideo: SeekBar
     private lateinit var tvVideoTime: TextView
-    private lateinit var cardFocus: View
+    private lateinit var cardCamouflage: View
     private lateinit var sheetLayer: View
     private lateinit var sheetPanel: View
     private lateinit var llSheetList: LinearLayout
@@ -369,8 +369,8 @@ class VaultActivity : Activity() {
             Page.SECURITY to findViewById<TextView>(R.id.navSecurity)
         )
 
-        switchFocus = findViewById(R.id.switchFocus)
-        tvFocusState = findViewById(R.id.tvFocusState)
+        switchCamouflage = findViewById(R.id.switchCamouflage)
+        tvCamouflageState = findViewById(R.id.tvCamouflageState)
         cardAccess = findViewById(R.id.cardAccess)
         tvBlockedCount = findViewById(R.id.tvBlockedCount)
         tvUnlockCount = findViewById(R.id.tvUnlockCount)
@@ -409,7 +409,7 @@ class VaultActivity : Activity() {
         llVideoBar = findViewById(R.id.llVideoBar)
         seekVideo = findViewById(R.id.seekVideo)
         tvVideoTime = findViewById(R.id.tvVideoTime)
-        cardFocus = findViewById(R.id.cardFocus)
+        cardCamouflage = findViewById(R.id.cardCamouflage)
         sheetLayer = findViewById(R.id.sheetLayer)
         sheetPanel = findViewById(R.id.sheetPanel)
         llSheetList = findViewById(R.id.llSheetList)
@@ -1916,10 +1916,10 @@ class VaultActivity : Activity() {
         for ((page, item) in navItems) item.setOnClickListener { showPage(page) }
 
         // Home
-        switchFocus.setOnCheckedChangeListener { _, checked ->
+        switchCamouflage.setOnCheckedChangeListener { _, checked ->
             if (!rendering) {
                 Prefs.setEnabled(this, checked)
-                renderFocusState(checked)
+                renderCamouflageState(checked)
                 TileService.requestListeningState(this, ComponentName(this, QuickTileService::class.java))
             }
         }
@@ -1953,10 +1953,10 @@ class VaultActivity : Activity() {
         val darkNow = Prefs.isDark(this)
         btnLight.setBackgroundResource(if (!darkNow) R.drawable.bg_btn_primary else R.drawable.bg_btn_tonal)
         btnDark.setBackgroundResource(if (darkNow) R.drawable.bg_btn_primary else R.drawable.bg_btn_tonal)
-        btnLight.setTextColor(if (!darkNow) Color.WHITE else getColor(R.color.vault_text))
-        btnDark.setTextColor(if (darkNow) Color.WHITE else getColor(R.color.vault_text))
-        btnLight.setOnClickListener { if (Prefs.isDark(this)) { Prefs.setDark(this, false); recreate() } }
-        btnDark.setOnClickListener { if (!Prefs.isDark(this)) { Prefs.setDark(this, true); recreate() } }
+        btnLight.setTextColor(if (!darkNow) getColor(R.color.vault_on_accent) else getColor(R.color.vault_text))
+        btnDark.setTextColor(if (darkNow) getColor(R.color.vault_on_accent) else getColor(R.color.vault_text))
+        btnLight.setOnClickListener { val was = Prefs.isDark(this); Prefs.setDark(this, false); if (was) recreate() }
+        btnDark.setOnClickListener { val was = Prefs.isDark(this); Prefs.setDark(this, true); if (!was) recreate() }
         findViewById<View>(R.id.btnChangePin).setOnClickListener {
             changingPin = true
             showGate(Mode.CREATE)
@@ -1971,14 +1971,14 @@ class VaultActivity : Activity() {
 
     private fun refreshAll() {
         rendering = true
-        switchFocus.isChecked = Prefs.isEnabled(this)
+        switchCamouflage.isChecked = Prefs.isEnabled(this)
         swTapHold.isChecked = Prefs.unlockEnabled(this, Prefs.METHOD_TAP_HOLD)
         swVolume.isChecked = Prefs.unlockEnabled(this, Prefs.METHOD_VOLUME)
         swCorner.isChecked = Prefs.unlockEnabled(this, Prefs.METHOD_CORNER)
         swTwoFinger.isChecked = Prefs.unlockEnabled(this, Prefs.METHOD_TWO_FINGER)
         rendering = false
 
-        renderFocusState(Prefs.isEnabled(this))
+        renderCamouflageState(Prefs.isEnabled(this))
         cardAccess.visibility = if (isServiceEnabled()) View.GONE else View.VISIBLE
         tvBlockedCount.text = Prefs.targets(this).size.toString()
         tvUnlockCount.text = Prefs.activeUnlockCount(this).toString()
@@ -1994,10 +1994,10 @@ class VaultActivity : Activity() {
         if (!recordingCorner) tvCornerCode.text = cornerText(Prefs.cornerCode(this))
     }
 
-    private fun renderFocusState(on: Boolean) {
-        tvFocusState.setText(if (on) R.string.vault_focus_on else R.string.vault_focus_off)
-        tvFocusState.setTextColor(getColor(if (on) R.color.vault_ok else R.color.vault_text_dim))
-        cardFocus.setBackgroundResource(if (on) R.drawable.bg_hero_on else R.drawable.bg_vault_card)
+    private fun renderCamouflageState(on: Boolean) {
+        tvCamouflageState.setText(if (on) R.string.vault_camouflage_on else R.string.vault_camouflage_off)
+        tvCamouflageState.setTextColor(getColor(if (on) R.color.vault_ok else R.color.vault_text_dim))
+        cardCamouflage.setBackgroundResource(if (on) R.drawable.bg_hero_on else R.drawable.bg_vault_card)
     }
 
     private fun isServiceEnabled(): Boolean {

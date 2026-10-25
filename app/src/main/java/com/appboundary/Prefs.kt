@@ -118,8 +118,14 @@ object Prefs {
 
     // ---- Vault PIN -----------------------------------------------------------
 
-    /** White is the default; "dark" is opt-in from the security page. */
-    fun isDark(context: Context): Boolean = prefs(context).getString(KEY_THEME, "light") == "dark"
+    /** Vault theme only (the blocker screen is never affected). Follows the system until the user picks one. */
+    fun isDark(context: Context): Boolean = when (prefs(context).getString(KEY_THEME, null)) {
+        "dark" -> true
+        "light" -> false
+        else -> (context.resources.configuration.uiMode and
+            android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+            android.content.res.Configuration.UI_MODE_NIGHT_YES
+    }
 
     fun setDark(context: Context, dark: Boolean) {
         prefs(context).edit().putString(KEY_THEME, if (dark) "dark" else "light").apply()

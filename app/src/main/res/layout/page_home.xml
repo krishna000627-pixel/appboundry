@@ -40,9 +40,9 @@
                 android:text="@string/vault_access_fix" />
         </LinearLayout>
 
-        <!-- Focus mode hero -->
+        <!-- Camouflage hero -->
         <LinearLayout
-            android:id="@+id/cardFocus"
+            android:id="@+id/cardCamouflage"
             style="@style/Vault.Card"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -60,13 +60,13 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/vault_focus_title"
+                    android:text="@string/vault_camouflage_title"
                     android:textColor="@color/vault_text"
                     android:textSize="22sp"
                     android:textStyle="bold" />
 
                 <TextView
-                    android:id="@+id/tvFocusState"
+                    android:id="@+id/tvCamouflageState"
                     style="@style/Vault.Body"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -75,7 +75,7 @@
             </LinearLayout>
 
             <Switch
-                android:id="@+id/switchFocus"
+                android:id="@+id/switchCamouflage"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:scaleX="1.2"

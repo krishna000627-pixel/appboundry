@@ -4,12 +4,13 @@
     <color name="vault_card">#F4F4F8</color>
     <color name="vault_stroke">#E2E2EA</color>
     <color name="vault_text">#111118</color>
-    <color name="vault_text_dim">#6B6B7C</color>
-    <color name="vault_accent">#6B5CF0</color>
+    <color name="vault_text_dim">#5F5F70</color>
+    <color name="vault_on_accent">#FFFFFF</color>
+    <color name="vault_accent">#5B4BE0</color>
     <color name="vault_tonal">#ECECF3</color>
     <color name="vault_key">#F0F0F6</color>
-    <color name="vault_danger">#E5484D</color>
-    <color name="vault_ok">#16A34A</color>
+    <color name="vault_danger">#C62F34</color>
+    <color name="vault_ok">#15803D</color>
     <color name="vault_track_on">#B9B0FF</color>
     <color name="vault_track_off">#D4D4DD</color>
     <color name="icon_bg">#0E0E13</color>
@@ -23,4 +24,10 @@
     <color name="vault_hero_b">#F4F4F8</color>
     <color name="vault_hero_stroke">#8B7CFF</color>
     <color name="vault_blue">#1A66E0</color>
+    <!-- Blocker screen: always the system theme, never the vault's own switch. -->
+    <color name="alert_bg">#FFFFFF</color>
+    <color name="alert_card">#F1F1F6</color>
+    <color name="alert_title">#111118</color>
+    <color name="alert_message">#46465A</color>
+    <color name="alert_button">#1A5FD0</color>
 </resources>

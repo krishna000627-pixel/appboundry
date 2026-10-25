@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Opaque, fullscreen, black: covers whatever is behind it (e.g. a playing reel). -->
-    <style name="Theme.AppBoundary.Alert" parent="@android:style/Theme.DeviceDefault.NoActionBar">
-        <item name="android:windowBackground">@android:color/black</item>
-        <item name="android:statusBarColor">@android:color/black</item>
-        <item name="android:navigationBarColor">@android:color/black</item>
+    <!-- Opaque, fullscreen, follows the system theme: covers whatever is behind it (e.g. a playing reel). -->
+    <style name="Theme.AppBoundary.Alert" parent="@android:style/Theme.DeviceDefault.Light.NoActionBar">
+        <item name="android:windowBackground">@color/alert_bg</item>
+        <item name="android:statusBarColor">@color/alert_bg</item>
+        <item name="android:navigationBarColor">@color/alert_bg</item>
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowAnimationStyle">@null</item>
     </style>
@@ -60,7 +60,7 @@
     </style>
 
     <style name="Vault.Button.Primary">
-        <item name="android:textColor">#FFFFFF</item>
+        <item name="android:textColor">@color/vault_on_accent</item>
         <item name="android:background">@drawable/bg_btn_primary</item>
     </style>
 
@@ -82,5 +82,16 @@
         <item name="android:textColorAlertDialogListItem">@color/vault_text</item>
         <item name="android:windowMinWidthMajor">80%</item>
         <item name="android:windowMinWidthMinor">88%</item>
+        <item name="android:windowTitleStyle">@style/Vault.DialogTitle</item>
+        <item name="android:buttonBarButtonStyle">@style/Vault.DialogButton</item>
+    </style>
+
+    <!-- Dialog title and buttons set their own colours so they stay readable in day and night. -->
+    <style name="Vault.DialogTitle" parent="@android:style/TextAppearance.DeviceDefault.DialogWindowTitle">
+        <item name="android:textColor">@color/vault_text</item>
+    </style>
+
+    <style name="Vault.DialogButton" parent="@android:style/Widget.DeviceDefault.Button.Borderless.Colored">
+        <item name="android:textColor">@color/vault_accent</item>
     </style>
 </resources>

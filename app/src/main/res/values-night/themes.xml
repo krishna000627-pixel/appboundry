@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Blocker screen, night: same system-following theme, dark. -->
+    <style name="Theme.AppBoundary.Alert" parent="@android:style/Theme.DeviceDefault.NoActionBar">
+        <item name="android:windowBackground">@color/alert_bg</item>
+        <item name="android:statusBarColor">@color/alert_bg</item>
+        <item name="android:navigationBarColor">@color/alert_bg</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
+
     <!-- Vault: dark, calm, edge to edge colors. -->
     <style name="Theme.AppBoundary.Vault" parent="@android:style/Theme.DeviceDefault.NoActionBar">
         <item name="android:windowBackground">@color/vault_bg</item>
@@ -17,5 +26,7 @@
         <item name="android:textColorAlertDialogListItem">@color/vault_text</item>
         <item name="android:windowMinWidthMajor">80%</item>
         <item name="android:windowMinWidthMinor">88%</item>
+        <item name="android:windowTitleStyle">@style/Vault.DialogTitle</item>
+        <item name="android:buttonBarButtonStyle">@style/Vault.DialogButton</item>
     </style>
 </resources>

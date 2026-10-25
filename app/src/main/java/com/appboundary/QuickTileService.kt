@@ -5,7 +5,7 @@ import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 
 /**
- * Tap = focus mode on/off. Long press = Android opens VaultActivity
+ * Tap = camouflage on/off. Long press = Android opens VaultActivity
  * (it declares the QS_TILE_PREFERENCES action in the manifest).
  */
 class QuickTileService : TileService() {
