@@ -96,7 +96,13 @@ class VaultActivity : Activity() {
     private lateinit var tvStatusStorage: TextView
 
     // Photos and videos
-    private enum class MediaFilter { ALL, PHOTOS, VIDEOS }
+    private enum class Folder(val labelRes: Int) {
+        SCREENSHOTS(R.string.vault_folder_screenshots),
+        CAMERA(R.string.vault_folder_camera),
+        WHATSAPP(R.string.vault_folder_whatsapp),
+        OTHER(R.string.vault_folder_other),
+        VIDEOS(R.string.vault_folder_videos)
+    }
 
     private lateinit var gvMedia: GridView
     private lateinit var tvMediaEmpty: TextView
@@ -134,7 +140,11 @@ class VaultActivity : Activity() {
     private val mediaAdapter = MediaAdapter()
     private var allMedia: List<MediaVault.Item> = emptyList()
     private var mediaItems: List<MediaVault.Item> = emptyList()
-    private var mediaFilter = MediaFilter.ALL
+    private var openFolder: Folder? = null
+    private var folderList: List<Pair<Folder, List<MediaVault.Item>>> = emptyList()
+    private var gridShowsFolders = true
+    private var folderCellH = 0
+    private val folderAdapter = FolderAdapter()
     private var newestFirst = true
     private var selectMode = false
     private val selected = LinkedHashSet<String>()
@@ -248,6 +258,7 @@ class VaultActivity : Activity() {
         when {
             viewerLayer.visibility == View.VISIBLE -> closeViewer()
             selectMode -> exitSelect()
+            currentPage == Page.PHOTOS && openFolder != null -> closeFolder()
             pickerLayer.visibility == View.VISIBLE -> closePicker()
             drawerOpen -> closeDrawer(true)
             gate.visibility == View.VISIBLE && changingPin -> {
@@ -719,12 +730,22 @@ class VaultActivity : Activity() {
 
     private fun bindMedia() {
         cellPx = (resources.displayMetrics.widthPixels - dp(40) - dp(8)) / 3
-        gvMedia.adapter = mediaAdapter
+        folderCellH = (((resources.displayMetrics.widthPixels - dp(40) - dp(8)) / 2) * 0.8f).toInt()
+        gvMedia.numColumns = 2
+        gvMedia.adapter = folderAdapter
         gvMedia.setOnItemClickListener { _, _, position, _ ->
+            if (openFolder == null) {
+                folderList.getOrNull(position)?.let {
+                    openFolder = it.first
+                    refreshMedia()
+                }
+                return@setOnItemClickListener
+            }
             val item = mediaItems.getOrNull(position) ?: return@setOnItemClickListener
             if (selectMode) toggleSelected(item) else openViewer(item)
         }
         gvMedia.setOnItemLongClickListener { _, _, position, _ ->
+            if (openFolder == null) return@setOnItemLongClickListener true
             val item = mediaItems.getOrNull(position)
             if (item != null) {
                 selectMode = true
@@ -733,9 +754,7 @@ class VaultActivity : Activity() {
             true
         }
         btnHideMedia.setOnClickListener { pickMedia() }
-        tabAll.setOnClickListener { setFilter(MediaFilter.ALL) }
-        tabPhotos.setOnClickListener { setFilter(MediaFilter.PHOTOS) }
-        tabVideos.setOnClickListener { setFilter(MediaFilter.VIDEOS) }
+        tabAll.setOnClickListener { closeFolder() }
         btnSort.setOnClickListener {
             newestFirst = !newestFirst
             refreshMedia()
@@ -771,9 +790,50 @@ class VaultActivity : Activity() {
         })
     }
 
-    private fun setFilter(f: MediaFilter) {
-        mediaFilter = f
+    private fun closeFolder() {
+        exitSelect()
+        openFolder = null
         refreshMedia()
+    }
+
+    /** Sorts a hidden item into a folder by what it is, judging by its original file name. */
+    private fun folderOf(item: MediaVault.Item): Folder {
+        if (item.video) return Folder.VIDEOS
+        val n = item.name.lowercase()
+        return when {
+            n.contains("screenshot") || n.contains("screen_shot") || n.startsWith("screen") -> Folder.SCREENSHOTS
+            n.contains("-wa0") || n.contains("whatsapp") -> Folder.WHATSAPP
+            n.startsWith("img_") || n.startsWith("pxl_") || n.startsWith("dsc") ||
+                n.startsWith("mvimg") || n.matches(Regex("^\\d{8}[_-]\\d{6}.*")) -> Folder.CAMERA
+            else -> Folder.OTHER
+        }
+    }
+
+    /** Folder list on top level; thumbnails of one folder once it is opened. */
+    private fun renderMediaMode() {
+        val inFolder = openFolder != null
+        if (inFolder == gridShowsFolders) {
+            gridShowsFolders = !inFolder
+            if (inFolder) {
+                gvMedia.numColumns = 3
+                gvMedia.adapter = mediaAdapter
+            } else {
+                gvMedia.numColumns = 2
+                gvMedia.adapter = folderAdapter
+            }
+        }
+        folderAdapter.notifyDataSetChanged()
+        val vis = if (inFolder) View.VISIBLE else View.GONE
+        tabAll.visibility = vis
+        tabPhotos.visibility = View.GONE
+        tabVideos.visibility = View.GONE
+        btnSort.visibility = vis
+        findViewById<View>(R.id.tvMediaHint).visibility = vis
+        val f = openFolder
+        if (f != null) {
+            tabAll.text = "\u2039  " + getString(f.labelRes) + "  " + mediaItems.size
+            styleTab(tabAll, true)
+        }
     }
 
     private fun styleTab(tv: TextView, on: Boolean) {
@@ -783,29 +843,27 @@ class VaultActivity : Activity() {
 
     private fun refreshMedia() {
         allMedia = MediaVault.list(this)
-        val photos = allMedia.count { !it.video }
-        val videos = allMedia.size - photos
-        tabAll.text = getString(R.string.vault_tab_all, allMedia.size)
-        tabPhotos.text = getString(R.string.vault_tab_photos, photos)
-        tabVideos.text = getString(R.string.vault_tab_videos, videos)
-        styleTab(tabAll, mediaFilter == MediaFilter.ALL)
-        styleTab(tabPhotos, mediaFilter == MediaFilter.PHOTOS)
-        styleTab(tabVideos, mediaFilter == MediaFilter.VIDEOS)
-        btnSort.setText(if (newestFirst) R.string.vault_sort_newest else R.string.vault_sort_oldest)
-
-        val filtered = when (mediaFilter) {
-            MediaFilter.ALL -> allMedia
-            MediaFilter.PHOTOS -> allMedia.filter { !it.video }
-            MediaFilter.VIDEOS -> allMedia.filter { it.video }
+        folderList = Folder.values().mapNotNull { f ->
+            val list = allMedia.filter { folderOf(it) == f }
+            if (list.isEmpty()) null else f to list
         }
-        mediaItems = if (newestFirst) filtered.sortedByDescending { it.added } else filtered.sortedBy { it.added }
+        if (openFolder != null && folderList.none { it.first == openFolder }) openFolder = null
+        val cur = openFolder
+        mediaItems = if (cur == null) {
+            emptyList()
+        } else {
+            val l = folderList.first { it.first == cur }.second
+            if (newestFirst) l.sortedByDescending { it.added } else l.sortedBy { it.added }
+        }
+        btnSort.setText(if (newestFirst) R.string.vault_sort_newest else R.string.vault_sort_oldest)
+        renderMediaMode()
         selected.retainAll(allMedia.map { it.id }.toSet())
         syncViewer()
 
         val size = Formatter.formatFileSize(this, MediaVault.totalBytes(allMedia))
         tvMediaCount.text = getString(R.string.vault_media_summary, allMedia.size, size)
         tvStatusStorage.text = size
-        tvMediaEmpty.visibility = if (mediaItems.isEmpty()) View.VISIBLE else View.GONE
+        tvMediaEmpty.visibility = if (allMedia.isEmpty()) View.VISIBLE else View.GONE
         tvHomeMediaCount.text = allMedia.size.toString()
         renderSelection()
 
@@ -1065,6 +1123,7 @@ class VaultActivity : Activity() {
         setPlayIcon(false)
         seekVideo.progress = 0
         tvVideoTime.text = ""
+        viewerLayer.post { fitPager(false) }
     }
 
     /** Tap on the picture: hide or show the title bar, buttons and play control. */
@@ -1089,6 +1148,33 @@ class VaultActivity : Activity() {
             }
         }
         if (show && isPlayingVideo()) ui.postDelayed(autoHide, 2500)
+        fitPager(animate)
+    }
+
+    /** Controls showing: the picture is reduced to the space between the bars. Hidden: it fills the page. */
+    private fun fitPager(animate: Boolean, retry: Boolean = true) {
+        var scale = 1f
+        var ty = 0f
+        if (controlsVisible) {
+            val h = pager.height
+            val top = viewerTop.height
+            val bottom = viewerBottom.height
+            if (h <= 0 || top <= 0 || bottom <= 0) {
+                if (retry) viewerLayer.post { fitPager(false, false) }
+                return
+            }
+            scale = ((h - top - bottom).toFloat() / h).coerceIn(0.3f, 1f)
+            ty = (top - bottom) / 2f
+        }
+        pager.animate().cancel()
+        if (animate) {
+            pager.animate().scaleX(scale).scaleY(scale).translationY(ty).setDuration(180).start()
+        } else {
+            pager.scaleX = scale
+            pager.scaleY = scale
+            pager.translationY = ty
+        }
+        btnPlay.translationY = ty
     }
 
     private fun isPlayingVideo(): Boolean {
@@ -1183,6 +1269,10 @@ class VaultActivity : Activity() {
         pager.release()
         viewerLayer.visibility = View.GONE
         viewerLayer.alpha = 1f
+        pager.scaleX = 1f
+        pager.scaleY = 1f
+        pager.translationY = 0f
+        btnPlay.translationY = 0f
         exitFullScreen()
     }
 
@@ -1200,6 +1290,7 @@ class VaultActivity : Activity() {
             viewerTop.layoutParams = viewerTop.layoutParams.also { it.height = dp(72) + bars.top }
             viewerTop.setPadding(dp(8), dp(8) + bars.top, dp(16), 0)
             viewerBottom.setPadding(dp(16), dp(28), dp(16), dp(16) + bars.bottom)
+            viewerLayer.post { fitPager(false) }
             insets
         }
         viewerLayer.requestApplyInsets()
@@ -1254,6 +1345,29 @@ class VaultActivity : Activity() {
                 refreshMedia()
             }
             .show()
+    }
+
+    private inner class FolderAdapter : BaseAdapter() {
+        override fun getCount(): Int = folderList.size
+        override fun getItem(position: Int): Any = folderList[position]
+        override fun getItemId(position: Int): Long = position.toLong()
+
+        override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+            val v = convertView ?: layoutInflater.inflate(R.layout.cell_folder, parent, false)
+            v.layoutParams = AbsListView.LayoutParams(AbsListView.LayoutParams.MATCH_PARENT, folderCellH)
+            val (folder, list) = folderList[position]
+            val first = list.maxByOrNull { it.added } ?: return v
+            val iv = v.findViewById<ImageView>(R.id.ivFolderThumb)
+            iv.tag = first.id
+            iv.setImageDrawable(null)
+            v.findViewById<TextView>(R.id.tvFolderName).text = getString(folder.labelRes)
+            v.findViewById<TextView>(R.id.tvFolderCount).text =
+                list.size.toString() + "  \u00B7  " + Formatter.formatFileSize(this@VaultActivity, MediaVault.totalBytes(list))
+            MediaVault.thumb(first, folderCellH * 2) { bmp: Bitmap? ->
+                if (iv.tag == first.id && bmp != null) iv.setImageBitmap(bmp)
+            }
+            return v
+        }
     }
 
     private inner class MediaAdapter : BaseAdapter() {
@@ -1312,27 +1426,9 @@ class VaultActivity : Activity() {
             item.setBackgroundResource(if (selected) R.drawable.bg_nav_selected else 0)
             item.setTextColor(getColor(if (selected) R.color.vault_accent else R.color.vault_text))
         }
-        styleBottomNav(page)
         closeDrawer(true)
         refreshAll()
         if (page == Page.PHOTOS) maybeAskAllFiles()
-    }
-
-    private fun styleBottomNav(page: Page) {
-        val map = listOf(R.id.bnHome to Page.HOME, R.id.bnPhotos to Page.PHOTOS, R.id.bnApps to Page.BLOCKED)
-        var any = false
-        for ((id, p) in map) {
-            val on = p == page
-            if (on) any = true
-            tintBottomItem(findViewById(id), on)
-        }
-        tintBottomItem(findViewById(R.id.bnMore), !any)
-    }
-
-    private fun tintBottomItem(item: ViewGroup, on: Boolean) {
-        val color = getColor(if (on) R.color.vault_accent else R.color.vault_text_dim)
-        (item.getChildAt(0) as ImageView).setColorFilter(color)
-        (item.getChildAt(1) as TextView).setTextColor(color)
     }
 
     private fun openDrawer() {
@@ -1365,12 +1461,6 @@ class VaultActivity : Activity() {
             if (drawerOpen) closeDrawer(true) else openDrawer()
         }
         scrim.setOnClickListener { closeDrawer(true) }
-        findViewById<View>(R.id.bnHome).setOnClickListener { showPage(Page.HOME) }
-        findViewById<View>(R.id.bnPhotos).setOnClickListener { showPage(Page.PHOTOS) }
-        findViewById<View>(R.id.bnApps).setOnClickListener { showPage(Page.BLOCKED) }
-        findViewById<View>(R.id.bnMore).setOnClickListener {
-            if (drawerOpen) closeDrawer(true) else openDrawer()
-        }
         for ((page, item) in navItems) item.setOnClickListener { showPage(page) }
 
         // Home

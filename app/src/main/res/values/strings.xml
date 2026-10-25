@@ -90,7 +90,7 @@
     <string name="vault_nav_photos">Photos &amp; videos</string>
     <string name="vault_media_hide">Hide photos &amp; videos</string>
     <string name="vault_media_hiding">Hiding...</string>
-    <string name="vault_media_empty">Nothing hidden yet.\nTap the button above to hide photos and videos.</string>
+    <string name="vault_media_empty">Nothing hidden yet.\nAdd photos and videos from the Security page.</string>
     <string name="vault_media_count">%1$d hidden</string>
     <string name="vault_media_tile">Hidden photos &amp; videos</string>
     <string name="vault_media_play">&#9654;</string>
@@ -163,4 +163,11 @@
     <string name="vault_bnav_more">More</string>
     <string name="vault_media_pause">&#10074;&#10074;</string>
     <string name="vault_home_media_hint">Tap to view and manage</string>
+    <string name="vault_folder_screenshots">Screenshots</string>
+    <string name="vault_folder_camera">Camera</string>
+    <string name="vault_folder_whatsapp">WhatsApp</string>
+    <string name="vault_folder_other">Other photos</string>
+    <string name="vault_folder_videos">Videos</string>
+    <string name="vault_sec_hide_title">Add photos &amp; videos</string>
+    <string name="vault_sec_hide_desc">Pick photos and videos to hide in the vault. This is the only place to add them.</string>
 </resources>

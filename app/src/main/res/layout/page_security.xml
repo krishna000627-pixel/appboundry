@@ -16,6 +16,35 @@
             style="@style/Vault.Card"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginBottom="14dp"
+            android:orientation="vertical">
+
+            <TextView
+                style="@style/Vault.CardTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/vault_sec_hide_title" />
+
+            <TextView
+                style="@style/Vault.Body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/vault_sec_hide_desc" />
+
+            <TextView
+                android:id="@+id/btnHideMedia"
+                style="@style/Vault.Button.Primary"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="12dp"
+                android:text="@string/vault_media_hide" />
+        </LinearLayout>
+
+        <LinearLayout
+            style="@style/Vault.Card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:orientation="vertical">
 
             <TextView

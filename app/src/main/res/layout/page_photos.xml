@@ -42,13 +42,6 @@
     </LinearLayout>
 
     <TextView
-        android:id="@+id/btnHideMedia"
-        style="@style/Vault.Button.Primary"
-        android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:text="@string/vault_media_hide" />
-
-    <TextView
         android:id="@+id/tvMediaCount"
         style="@style/Vault.Body"
         android:layout_width="wrap_content"
