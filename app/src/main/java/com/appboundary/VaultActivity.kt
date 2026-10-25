@@ -24,6 +24,8 @@ import android.os.Handler
 import android.os.Looper
 import android.widget.SeekBar
 import android.widget.FrameLayout
+import android.widget.HorizontalScrollView
+import android.view.animation.DecelerateInterpolator
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.graphics.Color
@@ -125,6 +127,9 @@ class VaultActivity : Activity() {
     private lateinit var seekVideo: SeekBar
     private lateinit var tvVideoTime: TextView
     private lateinit var cardFocus: View
+    private lateinit var sheetLayer: View
+    private lateinit var sheetPanel: View
+    private lateinit var llSheetList: LinearLayout
     private var controlsVisible = true
     private var viewerCount = 0
     private var seeking = false
@@ -264,6 +269,7 @@ class VaultActivity : Activity() {
     @Suppress("OVERRIDE_DEPRECATION")
     override fun onBackPressed() {
         when {
+            sheetLayer.visibility == View.VISIBLE -> closeSheet()
             viewerLayer.visibility == View.VISIBLE -> closeViewer()
             selectMode -> exitSelect()
             currentPage == Page.PHOTOS && openFolder != null -> closeFolder()
@@ -373,6 +379,9 @@ class VaultActivity : Activity() {
         seekVideo = findViewById(R.id.seekVideo)
         tvVideoTime = findViewById(R.id.tvVideoTime)
         cardFocus = findViewById(R.id.cardFocus)
+        sheetLayer = findViewById(R.id.sheetLayer)
+        sheetPanel = findViewById(R.id.sheetPanel)
+        llSheetList = findViewById(R.id.llSheetList)
         tvViewerTitle = findViewById(R.id.tvViewerTitle)
 
         llBlocked = findViewById(R.id.llBlocked)
@@ -737,8 +746,8 @@ class VaultActivity : Activity() {
     // ---- Photos and videos --------------------------------------------------
 
     private fun bindMedia() {
-        cellPx = (resources.displayMetrics.widthPixels - dp(40) - dp(8)) / 3
-        folderCellH = (((resources.displayMetrics.widthPixels - dp(40) - dp(8)) / 2) * 0.8f).toInt()
+        cellPx = (resources.displayMetrics.widthPixels - dp(40) - dp(12)) / 3
+        folderCellH = (((resources.displayMetrics.widthPixels - dp(40) - dp(6)) / 2) * 0.8f).toInt()
         gvMedia.numColumns = 2
         gvMedia.adapter = folderAdapter
         gvMedia.setOnItemClickListener { _, _, position, _ ->
@@ -790,6 +799,8 @@ class VaultActivity : Activity() {
         findViewById<View>(R.id.btnViewerDelete).setOnClickListener { confirmDeleteViewing() }
         pager.host = pagerHost
         btnPlay.setOnClickListener { toggleVideo() }
+        findViewById<View>(R.id.btnViewerFolder).setOnClickListener { openSheet() }
+        sheetLayer.setOnClickListener { closeSheet() }
         seekVideo.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {
                 val page = pager.currentPage()
@@ -1306,6 +1317,7 @@ class VaultActivity : Activity() {
         viewing = null
         viewIndex = -1
         pager.release()
+        sheetLayer.visibility = View.GONE
         viewerLayer.visibility = View.GONE
         viewerLayer.alpha = 1f
         pager.scaleX = 1f
@@ -1329,6 +1341,7 @@ class VaultActivity : Activity() {
             viewerTop.layoutParams = viewerTop.layoutParams.also { it.height = dp(72) + bars.top }
             viewerTop.setPadding(dp(8), dp(8) + bars.top, dp(16), 0)
             viewerBottom.setPadding(dp(16), dp(28), dp(16), dp(16) + bars.bottom)
+            sheetPanel.setPadding(dp(8), dp(10), dp(8), dp(16) + bars.bottom)
             viewerLayer.post { fitPager(false) }
             insets
         }
@@ -1409,15 +1422,105 @@ class VaultActivity : Activity() {
         input.setText(start)
         input.setSingleLine()
         input.selectAll()
-        val box = FrameLayout(this)
+        val box = LinearLayout(this)
+        box.orientation = LinearLayout.VERTICAL
         box.setPadding(dp(20), dp(8), dp(20), 0)
         box.addView(input)
+        val recents = FolderStore.recent(this).filter { !it.equals(start, true) }
+        if (recents.isNotEmpty()) {
+            val label = TextView(this)
+            label.setText(R.string.vault_folder_recent)
+            label.textSize = 12f
+            label.setTextColor(getColor(R.color.vault_text_dim))
+            label.setPadding(0, dp(14), 0, dp(6))
+            box.addView(label)
+            val scroll = HorizontalScrollView(this)
+            scroll.isHorizontalScrollBarEnabled = false
+            val chips = LinearLayout(this)
+            for (name in recents) {
+                val chip = TextView(this)
+                chip.text = name
+                chip.textSize = 13f
+                chip.setTextColor(getColor(R.color.vault_text))
+                chip.setBackgroundResource(R.drawable.bg_btn_tonal)
+                chip.setPadding(dp(14), dp(8), dp(14), dp(8))
+                chip.setOnClickListener {
+                    input.setText(name)
+                    input.setSelection(name.length)
+                }
+                val lp = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+                lp.marginEnd = dp(8)
+                chips.addView(chip, lp)
+            }
+            scroll.addView(chips)
+            box.addView(scroll)
+        }
         AlertDialog.Builder(this)
             .setTitle(titleRes)
             .setView(box)
             .setNegativeButton(R.string.vault_media_cancel, null)
             .setPositiveButton(R.string.vault_folder_create) { _, _ -> onOk(input.text.toString().trim()) }
             .show()
+    }
+
+    // -- "Add to folder" sheet on the picture page --
+
+    private fun openSheet() {
+        val item = viewing ?: return
+        val current = FolderStore.assignments(this)[item.id]
+        llSheetList.removeAllViews()
+        fun addRow(label: String, iconRes: Int, checked: Boolean, onClick: () -> Unit) {
+            val row = layoutInflater.inflate(R.layout.row_sheet, llSheetList, false)
+            row.findViewById<TextView>(R.id.tvSheetName).text = label
+            row.findViewById<ImageView>(R.id.ivSheetIcon).setImageResource(iconRes)
+            row.findViewById<View>(R.id.tvSheetCheck).visibility = if (checked) View.VISIBLE else View.INVISIBLE
+            row.setOnClickListener { onClick() }
+            llSheetList.addView(row)
+        }
+        addRow(getString(R.string.vault_folder_auto), R.drawable.ic_photos, current == null) {
+            assignViewing(null)
+        }
+        for (name in FolderStore.names(this)) {
+            addRow(name, R.drawable.ic_folder, current == name) { assignViewing(name) }
+        }
+        addRow(getString(R.string.vault_folder_new), R.drawable.ic_folder_add, false) {
+            newFolderDialog { created -> assignViewing(created) }
+        }
+        val scroll = findViewById<View>(R.id.sheetScroll)
+        val maxH = (resources.displayMetrics.heightPixels * 0.5f).toInt()
+        scroll.layoutParams = scroll.layoutParams.also {
+            it.height = if (llSheetList.childCount * dp(52) > maxH) maxH else ViewGroup.LayoutParams.WRAP_CONTENT
+        }
+        sheetLayer.animate().cancel()
+        sheetPanel.animate().cancel()
+        sheetLayer.alpha = 0f
+        sheetLayer.visibility = View.VISIBLE
+        sheetLayer.animate().alpha(1f).setDuration(180).start()
+        sheetPanel.translationY = dp(500).toFloat()
+        sheetPanel.animate().translationY(0f).setDuration(240).setInterpolator(DecelerateInterpolator()).start()
+    }
+
+    private fun closeSheet() {
+        if (sheetLayer.visibility != View.VISIBLE) return
+        sheetLayer.animate().alpha(0f).setDuration(160).start()
+        sheetPanel.animate().translationY(sheetPanel.height.toFloat()).setDuration(200)
+            .withEndAction { sheetLayer.visibility = View.GONE }
+            .start()
+    }
+
+    private fun assignViewing(target: String?) {
+        val item = viewing ?: return
+        FolderStore.assign(this, listOf(item.id), target)
+        closeSheet()
+        Toast.makeText(
+            this,
+            getString(R.string.vault_folder_moved_to, target ?: getString(R.string.vault_folder_auto)),
+            Toast.LENGTH_SHORT
+        ).show()
+        refreshMedia()
     }
 
     /** Makes a folder named "Folder N" (the number is filled in, the name can be changed). */
@@ -1506,8 +1609,12 @@ class VaultActivity : Activity() {
             val tvName = v.findViewById<TextView>(R.id.tvFolderName)
             val tvCount = v.findViewById<TextView>(R.id.tvFolderCount)
             iv.setImageDrawable(null)
+            val icon = v.findViewById<ImageView>(R.id.ivFolderIcon)
+            icon.visibility = View.GONE
             val entry = folderList.getOrNull(position)
             if (entry == null) {
+                icon.setImageResource(R.drawable.ic_folder_add)
+                icon.visibility = View.VISIBLE
                 iv.tag = ""
                 tvName.text = "+  " + getString(R.string.vault_folder_new)
                 tvCount.setText(R.string.vault_folder_new_hint)
@@ -1516,8 +1623,10 @@ class VaultActivity : Activity() {
             tvName.text = entry.label
             val first = entry.items.maxByOrNull { it.added }
             if (first == null) {
+                icon.setImageResource(R.drawable.ic_folder)
+                icon.visibility = View.VISIBLE
                 iv.tag = ""
-                tvCount.text = "0"
+                tvCount.setText(R.string.vault_folder_empty_count)
                 return v
             }
             iv.tag = first.id
@@ -1545,7 +1654,12 @@ class VaultActivity : Activity() {
             v.findViewById<View>(R.id.tvPlay).visibility = if (item.video) View.VISIBLE else View.GONE
             val picked = selectMode && selected.contains(item.id)
             v.findViewById<View>(R.id.vSelect).visibility = if (picked) View.VISIBLE else View.GONE
-            v.findViewById<View>(R.id.tvCheck).visibility = if (picked) View.VISIBLE else View.GONE
+            val check = v.findViewById<TextView>(R.id.tvCheck)
+            check.visibility = if (selectMode) View.VISIBLE else View.GONE
+            check.setBackgroundResource(if (picked) R.drawable.bg_check_circle else R.drawable.bg_check_ring)
+            check.text = if (picked) getString(R.string.vault_media_check) else ""
+            v.scaleX = if (picked) 0.9f else 1f
+            v.scaleY = if (picked) 0.9f else 1f
             MediaVault.thumb(item, cellPx) { bmp: Bitmap? ->
                 if (iv.tag == item.id && bmp != null) iv.setImageBitmap(bmp)
             }

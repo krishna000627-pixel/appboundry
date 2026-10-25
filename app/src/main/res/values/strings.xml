@@ -186,4 +186,7 @@
     <string name="vault_folder_moved">Moved %1$d</string>
     <string name="vault_sel_move">Move</string>
     <string name="vault_no_gallery">No gallery app found</string>
+    <string name="vault_folder_recent">Used before</string>
+    <string name="vault_folder_moved_to">Moved to %1$s</string>
+    <string name="vault_folder_empty_count">Empty</string>
 </resources>

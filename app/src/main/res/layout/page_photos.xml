@@ -119,13 +119,13 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:clipToPadding="false"
-            android:horizontalSpacing="4dp"
+            android:horizontalSpacing="6dp"
             android:listSelector="@android:color/transparent"
             android:numColumns="3"
             android:paddingBottom="20dp"
             android:scrollbars="none"
             android:stretchMode="columnWidth"
-            android:verticalSpacing="4dp" />
+            android:verticalSpacing="6dp" />
 
         <TextView
             android:id="@+id/tvMediaEmpty"
