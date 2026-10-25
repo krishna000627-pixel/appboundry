@@ -18,6 +18,7 @@ object Prefs {
     private const val KEY_PIN_HASH = "pin_hash"
     private const val KEY_FAILS = "pin_fails"
     private const val KEY_LOCK_UNTIL = "pin_lock_until"
+    private const val KEY_BLOCK_SHOTS = "block_screenshots"
 
     const val MIN_TAPS = 2
     const val MAX_TAPS = 6
@@ -40,6 +41,15 @@ object Prefs {
 
     private fun prefs(context: Context) =
         context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+
+    // ---- Vault privacy --------------------------------------------------------
+
+    fun blockShots(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_BLOCK_SHOTS, true)
+
+    fun setBlockShots(context: Context, on: Boolean) {
+        prefs(context).edit().putBoolean(KEY_BLOCK_SHOTS, on).apply()
+    }
 
     // ---- Monitoring ---------------------------------------------------------
 

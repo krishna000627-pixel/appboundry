@@ -12,6 +12,38 @@
         android:orientation="vertical"
         android:padding="20dp">
 
+        <!-- Live preview -->
+        <LinearLayout
+            style="@style/Vault.Card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="14dp"
+            android:orientation="vertical">
+
+            <TextView
+                style="@style/Vault.Body"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/vault_alert_preview_label" />
+
+            <TextView
+                android:id="@+id/tvPrevTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textColor="@color/vault_text"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvPrevMsg"
+                style="@style/Vault.Body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:textSize="14sp" />
+        </LinearLayout>
+
         <LinearLayout
             style="@style/Vault.Card"
             android:layout_width="match_parent"
@@ -42,6 +74,14 @@
                 android:gravity="top|start"
                 android:inputType="textMultiLine|textCapSentences"
                 android:minLines="3" />
+
+            <TextView
+                android:id="@+id/tvAlertCounts"
+                style="@style/Vault.Body"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:textSize="12sp" />
 
             <TextView
                 style="@style/Vault.Body"

@@ -33,6 +33,9 @@ class AlertActivity : Activity() {
     private var targetPackage: String? = null
     private var label: String = ""
 
+    /** Opened from the vault's Preview button: OK and unlock just close it and return to the vault. */
+    private var preview = false
+
     // Way 1: taps on the black area, then hold the box.
     private var taps = 0
     private var lastTapAt = 0L
@@ -121,6 +124,7 @@ class AlertActivity : Activity() {
 
     private fun applyTarget(intent: Intent) {
         targetPackage = intent.getStringExtra(EXTRA_PACKAGE)
+        preview = intent.getBooleanExtra(EXTRA_PREVIEW, false)
         label = resolveLabel(targetPackage)
         taps = 0
         volumeMatcher.progress = 0
@@ -202,8 +206,21 @@ class AlertActivity : Activity() {
     }
 
     private fun unlockNow() {
+        if (preview) {
+            returnToVault()
+            return
+        }
         BoundaryAccessibilityService.grantSession(targetPackage)
         finish()
+    }
+
+    /** Preview only: close this screen and bring the vault back instead of going home. */
+    private fun returnToVault() {
+        finish()
+        startActivity(
+            Intent(this, VaultActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+        )
     }
 
     private fun resolveLabel(pkg: String?): String {
@@ -212,6 +229,10 @@ class AlertActivity : Activity() {
     }
 
     private fun goHomeAndFinish() {
+        if (preview) {
+            returnToVault()
+            return
+        }
         BoundaryAccessibilityService.markDismissed()
         // Primary: the accessibility HOME action. Backup: a plain home intent, in case the
         // action is dropped while this screen is closing.
@@ -244,6 +265,7 @@ class AlertActivity : Activity() {
 
     companion object {
         private const val EXTRA_PACKAGE = "extra_package"
+        private const val EXTRA_PREVIEW = "extra_preview"
         private const val TAP_MAX_MS = 350L
         private const val TAP_WINDOW_MS = 2000L
         private const val ARM_WINDOW_MS = 3000L
@@ -254,9 +276,10 @@ class AlertActivity : Activity() {
         var isShowing = false
             private set
 
-        fun createIntent(context: Context, targetPackage: String): Intent =
+        fun createIntent(context: Context, targetPackage: String, preview: Boolean = false): Intent =
             Intent(context, AlertActivity::class.java)
                 .putExtra(EXTRA_PACKAGE, targetPackage)
+                .putExtra(EXTRA_PREVIEW, preview)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
     }
 }

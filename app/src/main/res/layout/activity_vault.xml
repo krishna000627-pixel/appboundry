@@ -134,6 +134,7 @@
                 android:layout_weight="1">
 
                 <include layout="@layout/page_home" />
+                <include layout="@layout/page_photos" />
                 <include layout="@layout/page_blocked" />
                 <include layout="@layout/page_alert" />
                 <include layout="@layout/page_unlock" />
@@ -200,6 +201,16 @@
                 android:layout_marginTop="2dp"
                 android:layout_marginEnd="12dp"
                 android:text="@string/vault_nav_home" />
+
+            <TextView
+                android:id="@+id/navPhotos"
+                style="@style/Vault.NavItem"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginStart="12dp"
+                android:layout_marginTop="2dp"
+                android:layout_marginEnd="12dp"
+                android:text="@string/vault_nav_photos" />
 
             <TextView
                 android:id="@+id/navBlocked"
@@ -328,5 +339,8 @@
                 android:layout_margin="16dp"
                 android:text="@string/vault_select_apps" />
         </LinearLayout>
+
+        <!-- Full-screen photo / video viewer -->
+        <include layout="@layout/layer_viewer" />
     </FrameLayout>
 </FrameLayout>

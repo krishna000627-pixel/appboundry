@@ -2,9 +2,23 @@ package com.appboundary
 
 import android.animation.ObjectAnimator
 import android.app.Activity
+import android.app.AlertDialog
+import android.graphics.Bitmap
+import android.net.Uri
+import android.provider.DocumentsContract
+import android.provider.MediaStore
+import android.view.WindowManager
+import android.widget.AbsListView
+import android.widget.GridView
+import android.widget.MediaController
+import android.widget.VideoView
 import android.content.ComponentName
 import android.content.Intent
 import android.os.Build
+import android.os.Environment
+import android.text.format.Formatter
+import java.text.DateFormat
+import java.util.Date
 import android.os.Bundle
 import android.os.CountDownTimer
 import android.provider.Settings
@@ -36,6 +50,7 @@ class VaultActivity : Activity() {
 
     private enum class Page(val titleRes: Int) {
         HOME(R.string.vault_nav_home),
+        PHOTOS(R.string.vault_nav_photos),
         BLOCKED(R.string.vault_nav_blocked),
         ALERT(R.string.vault_nav_alert),
         UNLOCK(R.string.vault_nav_unlock),
@@ -64,6 +79,56 @@ class VaultActivity : Activity() {
     private lateinit var cardAccess: View
     private lateinit var tvBlockedCount: TextView
     private lateinit var tvUnlockCount: TextView
+
+    private lateinit var cardMedia: View
+    private lateinit var tvHomeMediaCount: TextView
+    private lateinit var llHomeMedia: LinearLayout
+
+    // Home status
+    private lateinit var tvStatusAccess: TextView
+    private lateinit var tvStatusFiles: TextView
+    private lateinit var tvStatusStorage: TextView
+
+    // Photos and videos
+    private enum class MediaFilter { ALL, PHOTOS, VIDEOS }
+
+    private lateinit var gvMedia: GridView
+    private lateinit var tvMediaEmpty: TextView
+    private lateinit var tvMediaCount: TextView
+    private lateinit var btnHideMedia: TextView
+    private lateinit var cardFiles: View
+    private lateinit var tabAll: TextView
+    private lateinit var tabPhotos: TextView
+    private lateinit var tabVideos: TextView
+    private lateinit var btnSort: TextView
+    private lateinit var llSelectBar: View
+    private lateinit var tvSelCount: TextView
+    private lateinit var viewerLayer: View
+    private lateinit var ivViewer: ImageView
+    private lateinit var vvViewer: VideoView
+    private lateinit var tvViewerTitle: TextView
+    private lateinit var tvViewerInfo: TextView
+    private val mediaAdapter = MediaAdapter()
+    private var allMedia: List<MediaVault.Item> = emptyList()
+    private var mediaItems: List<MediaVault.Item> = emptyList()
+    private var mediaFilter = MediaFilter.ALL
+    private var newestFirst = true
+    private var selectMode = false
+    private val selected = LinkedHashSet<String>()
+    private var viewing: MediaVault.Item? = null
+    private var viewIndex = -1
+    private var cellPx = 0
+    private var holdLockUntil = 0L
+
+    // Page extras
+    private lateinit var tvBlockedSummary: TextView
+    private lateinit var tvPrevTitle: TextView
+    private lateinit var tvPrevMsg: TextView
+    private lateinit var tvAlertCounts: TextView
+    private lateinit var tvUnlockSummary: TextView
+    private lateinit var tvSecAccess: TextView
+    private lateinit var tvSecFiles: TextView
+    private lateinit var swShots: Switch
 
     // Blocked apps
     private lateinit var llBlocked: LinearLayout
@@ -112,6 +177,8 @@ class VaultActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Hidden photos must not show up in screenshots or the recents preview.
+        applyShotFlag()
         setContentView(R.layout.activity_vault)
         bindViews()
         buildDots()
@@ -119,18 +186,29 @@ class VaultActivity : Activity() {
         bindVaultActions()
         bindUnlockActions()
         bindPicker()
+        bindMedia()
+        bindExtras()
         drawer.translationX = -dp(DRAWER_WIDTH_DP).toFloat()
         showGate(if (Prefs.hasPin(this)) Mode.UNLOCK else Mode.CREATE)
     }
 
     override fun onResume() {
         super.onResume()
+        if (holdLockUntil != 0L) {
+            val expired = System.currentTimeMillis() > holdLockUntil
+            holdLockUntil = 0L
+            if (expired && vaultRoot.visibility == View.VISIBLE) {
+                showGate(Mode.UNLOCK)
+                return
+            }
+        }
         if (vaultRoot.visibility == View.VISIBLE) refreshAll()
     }
 
     /** Leaving the screen always locks the vault again. */
     override fun onStop() {
         super.onStop()
+        if (System.currentTimeMillis() < holdLockUntil) return
         if (!isFinishing && vaultRoot.visibility == View.VISIBLE) {
             hideKeyboard()
             showGate(Mode.UNLOCK)
@@ -145,6 +223,8 @@ class VaultActivity : Activity() {
     @Suppress("OVERRIDE_DEPRECATION")
     override fun onBackPressed() {
         when {
+            viewerLayer.visibility == View.VISIBLE -> closeViewer()
+            selectMode -> exitSelect()
             pickerLayer.visibility == View.VISIBLE -> closePicker()
             drawerOpen -> closeDrawer(true)
             gate.visibility == View.VISIBLE && changingPin -> {
@@ -195,6 +275,7 @@ class VaultActivity : Activity() {
         drawer = findViewById(R.id.drawer)
         pageViews = mapOf(
             Page.HOME to findViewById<View>(R.id.pageHome),
+            Page.PHOTOS to findViewById<View>(R.id.pagePhotos),
             Page.BLOCKED to findViewById<View>(R.id.pageBlocked),
             Page.ALERT to findViewById<View>(R.id.pageAlert),
             Page.UNLOCK to findViewById<View>(R.id.pageUnlock),
@@ -202,6 +283,7 @@ class VaultActivity : Activity() {
         )
         navItems = mapOf(
             Page.HOME to findViewById<TextView>(R.id.navHome),
+            Page.PHOTOS to findViewById<TextView>(R.id.navPhotos),
             Page.BLOCKED to findViewById<TextView>(R.id.navBlocked),
             Page.ALERT to findViewById<TextView>(R.id.navAlert),
             Page.UNLOCK to findViewById<TextView>(R.id.navUnlock),
@@ -213,6 +295,37 @@ class VaultActivity : Activity() {
         cardAccess = findViewById(R.id.cardAccess)
         tvBlockedCount = findViewById(R.id.tvBlockedCount)
         tvUnlockCount = findViewById(R.id.tvUnlockCount)
+        tvStatusAccess = findViewById(R.id.tvStatusAccess)
+        tvStatusFiles = findViewById(R.id.tvStatusFiles)
+        tvStatusStorage = findViewById(R.id.tvStatusStorage)
+        cardFiles = findViewById(R.id.cardFiles)
+        tabAll = findViewById(R.id.tabAll)
+        tabPhotos = findViewById(R.id.tabPhotos)
+        tabVideos = findViewById(R.id.tabVideos)
+        btnSort = findViewById(R.id.btnSort)
+        llSelectBar = findViewById(R.id.llSelectBar)
+        tvSelCount = findViewById(R.id.tvSelCount)
+        tvViewerInfo = findViewById(R.id.tvViewerInfo)
+        tvBlockedSummary = findViewById(R.id.tvBlockedSummary)
+        tvPrevTitle = findViewById(R.id.tvPrevTitle)
+        tvPrevMsg = findViewById(R.id.tvPrevMsg)
+        tvAlertCounts = findViewById(R.id.tvAlertCounts)
+        tvUnlockSummary = findViewById(R.id.tvUnlockSummary)
+        tvSecAccess = findViewById(R.id.tvSecAccess)
+        tvSecFiles = findViewById(R.id.tvSecFiles)
+        swShots = findViewById(R.id.swShots)
+        cardMedia = findViewById(R.id.cardMedia)
+        tvHomeMediaCount = findViewById(R.id.tvHomeMediaCount)
+        llHomeMedia = findViewById(R.id.llHomeMedia)
+
+        gvMedia = findViewById(R.id.gvMedia)
+        tvMediaEmpty = findViewById(R.id.tvMediaEmpty)
+        tvMediaCount = findViewById(R.id.tvMediaCount)
+        btnHideMedia = findViewById(R.id.btnHideMedia)
+        viewerLayer = findViewById(R.id.viewerLayer)
+        ivViewer = findViewById(R.id.ivViewer)
+        vvViewer = findViewById(R.id.vvViewer)
+        tvViewerTitle = findViewById(R.id.tvViewerTitle)
 
         llBlocked = findViewById(R.id.llBlocked)
         tvBlockedEmpty = findViewById(R.id.tvBlockedEmpty)
@@ -246,6 +359,7 @@ class VaultActivity : Activity() {
         if (newMode != Mode.CONFIRM) firstPin = null
         stopRecording()
         closeDrawer(false)
+        closeViewer()
         pickerLayer.visibility = View.GONE
         vaultRoot.visibility = View.GONE
         gate.visibility = View.VISIBLE
@@ -432,6 +546,521 @@ class VaultActivity : Activity() {
         }.start()
     }
 
+
+    // ---- Permissions and status ---------------------------------------------
+
+    private fun hasAllFiles(): Boolean =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) Environment.isExternalStorageManager() else true
+
+    private fun requestAllFiles() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
+        holdLockUntil = System.currentTimeMillis() + HOLD_LOCK_MS
+        try {
+            startActivity(
+                Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:$packageName"))
+            )
+        } catch (e: Exception) {
+            try {
+                startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
+            } catch (e2: Exception) {
+                holdLockUntil = 0L
+            }
+        }
+    }
+
+    /** Asks once, the first time the Photos page opens without all-files access. */
+    private fun maybeAskAllFiles() {
+        if (hasAllFiles()) return
+        val sp = getSharedPreferences("appboundary_media", MODE_PRIVATE)
+        if (sp.getBoolean("asked_all_files", false)) return
+        sp.edit().putBoolean("asked_all_files", true).apply()
+        AlertDialog.Builder(this)
+            .setTitle(R.string.vault_files_ask_title)
+            .setMessage(R.string.vault_files_desc)
+            .setNegativeButton(R.string.vault_files_later, null)
+            .setPositiveButton(R.string.vault_files_grant) { _, _ -> requestAllFiles() }
+            .show()
+    }
+
+    private fun applyShotFlag() {
+        if (Prefs.blockShots(this)) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
+    }
+
+    private fun setStatus(tv: TextView, ok: Boolean) {
+        tv.setText(if (ok) R.string.vault_status_on else R.string.vault_status_off)
+        tv.setTextColor(getColor(if (ok) R.color.vault_ok else R.color.vault_danger))
+    }
+
+    private fun renderStatus() {
+        val access = isServiceEnabled()
+        val files = hasAllFiles()
+        setStatus(tvStatusAccess, access)
+        setStatus(tvStatusFiles, files)
+        setStatus(tvSecAccess, access)
+        setStatus(tvSecFiles, files)
+        cardFiles.visibility = if (files) View.GONE else View.VISIBLE
+    }
+
+    private fun openAccessibilitySettings() {
+        startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+    }
+
+    private fun bindExtras() {
+        // Home
+        findViewById<View>(R.id.btnQuickHide).setOnClickListener { pickMedia() }
+        findViewById<View>(R.id.btnQuickApps).setOnClickListener {
+            showPage(Page.BLOCKED)
+            openPicker()
+        }
+        findViewById<View>(R.id.rowStatusAccess).setOnClickListener { openAccessibilitySettings() }
+        findViewById<View>(R.id.rowStatusFiles).setOnClickListener { requestAllFiles() }
+
+        // Blocked apps
+        findViewById<View>(R.id.btnRemoveAll).setOnClickListener {
+            if (Prefs.targets(this).isEmpty()) return@setOnClickListener
+            AlertDialog.Builder(this)
+                .setTitle(R.string.vault_remove_all_title)
+                .setMessage(R.string.vault_remove_all_msg)
+                .setNegativeButton(R.string.vault_media_cancel, null)
+                .setPositiveButton(R.string.vault_remove_all) { _, _ ->
+                    Prefs.setTargets(this, emptySet())
+                    refreshAll()
+                }
+                .show()
+        }
+
+        // Alert preview
+        val watcher = object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                updateAlertPreview()
+            }
+        }
+        etTitle.addTextChangedListener(watcher)
+        etMessage.addTextChangedListener(watcher)
+
+        // Security
+        findViewById<View>(R.id.rowSecAccess).setOnClickListener { openAccessibilitySettings() }
+        findViewById<View>(R.id.rowSecFiles).setOnClickListener { requestAllFiles() }
+        swShots.isChecked = Prefs.blockShots(this)
+        swShots.setOnCheckedChangeListener { _, checked ->
+            if (!rendering) {
+                Prefs.setBlockShots(this, checked)
+                applyShotFlag()
+            }
+        }
+        findViewById<View>(R.id.btnWipe).setOnClickListener {
+            val n = MediaVault.count(this)
+            if (n == 0) {
+                Toast.makeText(this, R.string.vault_media_empty_short, Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            AlertDialog.Builder(this)
+                .setTitle(R.string.vault_wipe_title)
+                .setMessage(getString(R.string.vault_wipe_msg, n))
+                .setNegativeButton(R.string.vault_media_cancel, null)
+                .setPositiveButton(R.string.vault_media_delete) { _, _ ->
+                    MediaVault.deleteAll(this)
+                    exitSelect()
+                    refreshMedia()
+                }
+                .show()
+        }
+    }
+
+    private fun updateAlertPreview() {
+        val app = Prefs.targets(this).firstOrNull()?.let { AppCache.label(this, it) }
+            ?: getString(R.string.fallback_app_name)
+        val rawTitle = etTitle.text.toString().trim()
+        val rawMsg = etMessage.text.toString().trim()
+        tvPrevTitle.text = if (rawTitle.isEmpty()) getString(R.string.alert_title) else rawTitle
+        tvPrevMsg.text = if (rawMsg.isEmpty()) {
+            getString(R.string.alert_message, app)
+        } else {
+            rawMsg.replace("{app}", app)
+        }
+        tvAlertCounts.text = getString(R.string.vault_alert_counts, rawTitle.length, rawMsg.length)
+    }
+
+    // ---- Photos and videos --------------------------------------------------
+
+    private fun bindMedia() {
+        cellPx = (resources.displayMetrics.widthPixels - dp(40) - dp(8)) / 3
+        gvMedia.adapter = mediaAdapter
+        gvMedia.setOnItemClickListener { _, _, position, _ ->
+            val item = mediaItems.getOrNull(position) ?: return@setOnItemClickListener
+            if (selectMode) toggleSelected(item) else openViewer(item)
+        }
+        gvMedia.setOnItemLongClickListener { _, _, position, _ ->
+            val item = mediaItems.getOrNull(position)
+            if (item != null) {
+                selectMode = true
+                toggleSelected(item)
+            }
+            true
+        }
+        btnHideMedia.setOnClickListener { pickMedia() }
+        tabAll.setOnClickListener { setFilter(MediaFilter.ALL) }
+        tabPhotos.setOnClickListener { setFilter(MediaFilter.PHOTOS) }
+        tabVideos.setOnClickListener { setFilter(MediaFilter.VIDEOS) }
+        btnSort.setOnClickListener {
+            newestFirst = !newestFirst
+            refreshMedia()
+        }
+        findViewById<View>(R.id.btnGrantFiles).setOnClickListener { requestAllFiles() }
+
+        findViewById<View>(R.id.btnSelAll).setOnClickListener {
+            selected.addAll(mediaItems.map { it.id })
+            renderSelection()
+        }
+        findViewById<View>(R.id.btnSelCancel).setOnClickListener { exitSelect() }
+        findViewById<View>(R.id.btnSelRestore).setOnClickListener { restoreSelected() }
+        findViewById<View>(R.id.btnSelDelete).setOnClickListener { confirmDeleteSelected() }
+
+        findViewById<View>(R.id.btnViewerBack).setOnClickListener { closeViewer() }
+        findViewById<View>(R.id.btnViewerRestore).setOnClickListener { restoreViewing() }
+        findViewById<View>(R.id.btnViewerDelete).setOnClickListener { confirmDeleteViewing() }
+        findViewById<View>(R.id.btnViewerPrev).setOnClickListener { stepViewer(-1) }
+        findViewById<View>(R.id.btnViewerNext).setOnClickListener { stepViewer(1) }
+    }
+
+    private fun setFilter(f: MediaFilter) {
+        mediaFilter = f
+        refreshMedia()
+    }
+
+    private fun styleTab(tv: TextView, on: Boolean) {
+        tv.setBackgroundResource(if (on) R.drawable.bg_nav_selected else 0)
+        tv.setTextColor(getColor(if (on) R.color.vault_accent else R.color.vault_text_dim))
+    }
+
+    private fun refreshMedia() {
+        allMedia = MediaVault.list(this)
+        val photos = allMedia.count { !it.video }
+        val videos = allMedia.size - photos
+        tabAll.text = getString(R.string.vault_tab_all, allMedia.size)
+        tabPhotos.text = getString(R.string.vault_tab_photos, photos)
+        tabVideos.text = getString(R.string.vault_tab_videos, videos)
+        styleTab(tabAll, mediaFilter == MediaFilter.ALL)
+        styleTab(tabPhotos, mediaFilter == MediaFilter.PHOTOS)
+        styleTab(tabVideos, mediaFilter == MediaFilter.VIDEOS)
+        btnSort.setText(if (newestFirst) R.string.vault_sort_newest else R.string.vault_sort_oldest)
+
+        val filtered = when (mediaFilter) {
+            MediaFilter.ALL -> allMedia
+            MediaFilter.PHOTOS -> allMedia.filter { !it.video }
+            MediaFilter.VIDEOS -> allMedia.filter { it.video }
+        }
+        mediaItems = if (newestFirst) filtered.sortedByDescending { it.added } else filtered.sortedBy { it.added }
+        selected.retainAll(allMedia.map { it.id }.toSet())
+
+        val size = Formatter.formatFileSize(this, MediaVault.totalBytes(allMedia))
+        tvMediaCount.text = getString(R.string.vault_media_summary, allMedia.size, size)
+        tvStatusStorage.text = size
+        tvMediaEmpty.visibility = if (mediaItems.isEmpty()) View.VISIBLE else View.GONE
+        tvHomeMediaCount.text = allMedia.size.toString()
+        renderSelection()
+
+        llHomeMedia.removeAllViews()
+        if (allMedia.isEmpty()) {
+            llHomeMedia.visibility = View.GONE
+            return
+        }
+        llHomeMedia.visibility = View.VISIBLE
+        val thumb = dp(64)
+        for (item in allMedia.take(4)) {
+            val iv = ImageView(this)
+            iv.scaleType = ImageView.ScaleType.CENTER_CROP
+            iv.setBackgroundColor(getColor(R.color.vault_tonal))
+            val lp = LinearLayout.LayoutParams(thumb, thumb)
+            lp.marginEnd = dp(8)
+            llHomeMedia.addView(iv, lp)
+            iv.tag = item.id
+            MediaVault.thumb(item, thumb * 2) { bmp ->
+                if (iv.tag == item.id && bmp != null) iv.setImageBitmap(bmp)
+            }
+        }
+    }
+
+    // -- selection --
+
+    private fun toggleSelected(item: MediaVault.Item) {
+        if (!selected.add(item.id)) selected.remove(item.id)
+        renderSelection()
+    }
+
+    private fun renderSelection() {
+        llSelectBar.visibility = if (selectMode) View.VISIBLE else View.GONE
+        tvSelCount.text = getString(R.string.vault_sel_count, selected.size)
+        mediaAdapter.notifyDataSetChanged()
+    }
+
+    private fun exitSelect() {
+        selectMode = false
+        selected.clear()
+        renderSelection()
+    }
+
+    private fun restoreSelected() {
+        val items = allMedia.filter { it.id in selected }
+        if (items.isEmpty()) return
+        val app = applicationContext
+        Thread {
+            var ok = 0
+            for (item in items) {
+                if (MediaVault.restore(app, item)) ok++
+            }
+            runOnUiThread {
+                if (isDestroyed) return@runOnUiThread
+                exitSelect()
+                refreshMedia()
+                if (ok > 0) {
+                    Toast.makeText(this, getString(R.string.vault_media_restored_n, ok), Toast.LENGTH_LONG).show()
+                } else {
+                    Toast.makeText(this, R.string.vault_media_restore_failed, Toast.LENGTH_LONG).show()
+                }
+            }
+        }.start()
+    }
+
+    private fun confirmDeleteSelected() {
+        val items = allMedia.filter { it.id in selected }
+        if (items.isEmpty()) return
+        AlertDialog.Builder(this)
+            .setTitle(R.string.vault_media_delete_title)
+            .setMessage(R.string.vault_media_delete_msg)
+            .setNegativeButton(R.string.vault_media_cancel, null)
+            .setPositiveButton(R.string.vault_media_delete) { _, _ ->
+                for (item in items) MediaVault.delete(this, item)
+                exitSelect()
+                refreshMedia()
+                Toast.makeText(this, getString(R.string.vault_media_deleted_n, items.size), Toast.LENGTH_SHORT).show()
+            }
+            .show()
+    }
+
+    // -- hiding --
+
+    private fun pickMedia() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/*", "video/*"))
+            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+        }
+        // The system picker takes the screen; do not re-lock while it is open.
+        holdLockUntil = System.currentTimeMillis() + HOLD_LOCK_MS
+        try {
+            @Suppress("DEPRECATION")
+            startActivityForResult(intent, REQ_PICK)
+        } catch (e: Exception) {
+            holdLockUntil = 0L
+        }
+    }
+
+    @Suppress("OVERRIDE_DEPRECATION")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        val expired = holdLockUntil != 0L && System.currentTimeMillis() > holdLockUntil
+        holdLockUntil = 0L
+        if (requestCode == REQ_PICK && resultCode == RESULT_OK && data != null) {
+            val uris = ArrayList<Uri>()
+            val clip = data.clipData
+            if (clip != null) {
+                for (i in 0 until clip.itemCount) uris.add(clip.getItemAt(i).uri)
+            } else {
+                data.data?.let { uris.add(it) }
+            }
+            hideUris(uris)
+        } else if (requestCode == REQ_DELETE) {
+            Toast.makeText(this, R.string.vault_media_originals_done, Toast.LENGTH_SHORT).show()
+        }
+        if (expired && vaultRoot.visibility == View.VISIBLE) showGate(Mode.UNLOCK)
+    }
+
+    private fun hideUris(uris: List<Uri>) {
+        if (uris.isEmpty()) return
+        btnHideMedia.isEnabled = false
+        btnHideMedia.setText(R.string.vault_media_hiding)
+        val app = applicationContext
+        val allFiles = hasAllFiles()
+        Thread {
+            val copied = ArrayList<Uri>()
+            for (u in uris) {
+                if (MediaVault.hide(app, u) != null) copied.add(u)
+            }
+            // Remove the originals; whatever the system refuses is handled below.
+            val stuck = ArrayList<Uri>()
+            for (u in copied) {
+                if (!MediaVault.deleteOriginal(app, u, allFiles)) stuck.add(u)
+            }
+            runOnUiThread {
+                if (isDestroyed) return@runOnUiThread
+                btnHideMedia.isEnabled = true
+                btnHideMedia.setText(R.string.vault_media_hide)
+                refreshMedia()
+                if (copied.size < uris.size) {
+                    Toast.makeText(this, R.string.vault_media_failed, Toast.LENGTH_LONG).show()
+                } else {
+                    Toast.makeText(this, getString(R.string.vault_media_hidden_n, copied.size), Toast.LENGTH_SHORT).show()
+                }
+                if (stuck.isNotEmpty()) askDeleteOriginals(stuck)
+            }
+        }.start()
+    }
+
+    /** Asks the system (one confirmation dialog) to delete originals it would not let us remove directly. */
+    private fun askDeleteOriginals(stuck: List<Uri>) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val mediaUris = ArrayList<Uri>()
+            for (u in stuck) {
+                try {
+                    MediaStore.getMediaUri(this, u)?.let { mediaUris.add(it) }
+                } catch (e: Exception) {
+                }
+            }
+            if (mediaUris.isNotEmpty()) {
+                try {
+                    val pi = MediaStore.createDeleteRequest(contentResolver, mediaUris)
+                    holdLockUntil = System.currentTimeMillis() + HOLD_LOCK_MS
+                    startIntentSenderForResult(pi.intentSender, REQ_DELETE, null, 0, 0, 0)
+                    return
+                } catch (e: Exception) {
+                    holdLockUntil = 0L
+                }
+            }
+        }
+        Toast.makeText(this, R.string.vault_media_originals, Toast.LENGTH_LONG).show()
+    }
+
+    // -- viewer --
+
+    private fun openViewer(item: MediaVault.Item) {
+        viewing = item
+        viewIndex = mediaItems.indexOfFirst { it.id == item.id }
+        showViewing()
+    }
+
+    private fun stepViewer(delta: Int) {
+        val next = viewIndex + delta
+        if (next !in mediaItems.indices) return
+        viewIndex = next
+        viewing = mediaItems[next]
+        showViewing()
+    }
+
+    private fun showViewing() {
+        val item = viewing ?: return
+        tvViewerTitle.text = item.name
+        val type = getString(if (item.video) R.string.vault_type_video else R.string.vault_type_photo)
+        val date = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(item.added))
+        tvViewerInfo.text = getString(
+            R.string.vault_viewer_info,
+            type,
+            Formatter.formatFileSize(this, item.file.length()),
+            date,
+            viewIndex + 1,
+            mediaItems.size
+        )
+        viewerLayer.visibility = View.VISIBLE
+        try {
+            vvViewer.stopPlayback()
+        } catch (e: Exception) {
+        }
+        if (item.video) {
+            ivViewer.setImageDrawable(null)
+            ivViewer.visibility = View.GONE
+            vvViewer.visibility = View.VISIBLE
+            vvViewer.setMediaController(MediaController(this).also { it.setAnchorView(vvViewer) })
+            vvViewer.setVideoPath(item.file.absolutePath)
+            vvViewer.start()
+        } else {
+            vvViewer.visibility = View.GONE
+            ivViewer.visibility = View.VISIBLE
+            ivViewer.setImageDrawable(null)
+            val maxPx = maxOf(resources.displayMetrics.widthPixels, resources.displayMetrics.heightPixels)
+            Thread {
+                val bmp = MediaVault.decode(item, maxPx)
+                runOnUiThread {
+                    if (!isDestroyed && viewing?.id == item.id) ivViewer.setImageBitmap(bmp)
+                }
+            }.start()
+        }
+    }
+
+    private fun closeViewer() {
+        if (!::viewerLayer.isInitialized) return
+        viewing = null
+        viewIndex = -1
+        try {
+            vvViewer.stopPlayback()
+        } catch (e: Exception) {
+        }
+        ivViewer.setImageDrawable(null)
+        viewerLayer.visibility = View.GONE
+    }
+
+    private fun restoreViewing() {
+        val item = viewing ?: return
+        val app = applicationContext
+        Thread {
+            val ok = MediaVault.restore(app, item)
+            runOnUiThread {
+                if (isDestroyed) return@runOnUiThread
+                if (ok) {
+                    closeViewer()
+                    refreshMedia()
+                    Toast.makeText(this, R.string.vault_media_restored, Toast.LENGTH_LONG).show()
+                } else {
+                    Toast.makeText(this, R.string.vault_media_restore_failed, Toast.LENGTH_LONG).show()
+                }
+            }
+        }.start()
+    }
+
+    private fun confirmDeleteViewing() {
+        val item = viewing ?: return
+        AlertDialog.Builder(this)
+            .setTitle(R.string.vault_media_delete_title)
+            .setMessage(R.string.vault_media_delete_msg)
+            .setNegativeButton(R.string.vault_media_cancel, null)
+            .setPositiveButton(R.string.vault_media_delete) { _, _ ->
+                MediaVault.delete(this, item)
+                closeViewer()
+                refreshMedia()
+            }
+            .show()
+    }
+
+    private inner class MediaAdapter : BaseAdapter() {
+        override fun getCount(): Int = mediaItems.size
+        override fun getItem(position: Int): Any = mediaItems[position]
+        override fun getItemId(position: Int): Long = position.toLong()
+
+        override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+            val v = convertView ?: layoutInflater.inflate(R.layout.cell_media, parent, false)
+            v.layoutParams = AbsListView.LayoutParams(AbsListView.LayoutParams.MATCH_PARENT, cellPx)
+            val iv = v.findViewById<ImageView>(R.id.ivThumb)
+            val item = mediaItems[position]
+            iv.tag = item.id
+            iv.setImageDrawable(null)
+            v.findViewById<View>(R.id.tvPlay).visibility = if (item.video) View.VISIBLE else View.GONE
+            val picked = selectMode && selected.contains(item.id)
+            v.findViewById<View>(R.id.vSelect).visibility = if (picked) View.VISIBLE else View.GONE
+            v.findViewById<View>(R.id.tvCheck).visibility = if (picked) View.VISIBLE else View.GONE
+            MediaVault.thumb(item, cellPx) { bmp: Bitmap? ->
+                if (iv.tag == item.id && bmp != null) iv.setImageBitmap(bmp)
+            }
+            return v
+        }
+    }
+
     // ---- Vault shell: pages and drawer --------------------------------------
 
     private fun openVault() {
@@ -449,6 +1078,7 @@ class VaultActivity : Activity() {
 
     private fun showPage(page: Page) {
         stopRecording()
+        if (page != Page.PHOTOS && selectMode) exitSelect()
         currentPage = page
         for ((p, view) in pageViews) {
             view.visibility = if (p == page) View.VISIBLE else View.GONE
@@ -466,6 +1096,7 @@ class VaultActivity : Activity() {
         }
         closeDrawer(true)
         refreshAll()
+        if (page == Page.PHOTOS) maybeAskAllFiles()
     }
 
     private fun openDrawer() {
@@ -511,6 +1142,7 @@ class VaultActivity : Activity() {
         findViewById<View>(R.id.btnAccess).setOnClickListener {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
         }
+        cardMedia.setOnClickListener { showPage(Page.PHOTOS) }
         findViewById<View>(R.id.tileBlocked).setOnClickListener { showPage(Page.BLOCKED) }
         findViewById<View>(R.id.tileUnlock).setOnClickListener { showPage(Page.UNLOCK) }
 
@@ -526,7 +1158,9 @@ class VaultActivity : Activity() {
         findViewById<View>(R.id.btnPreview).setOnClickListener {
             saveTexts(false)
             val target = Prefs.targets(this).firstOrNull() ?: packageName
-            startActivity(AlertActivity.createIntent(this, target))
+            // The preview takes the screen; keep the vault unlocked so OK can return here.
+            holdLockUntil = System.currentTimeMillis() + HOLD_LOCK_MS
+            startActivity(AlertActivity.createIntent(this, target, true))
         }
 
         // Security
@@ -557,6 +1191,10 @@ class VaultActivity : Activity() {
         tvUnlockCount.text = Prefs.activeUnlockCount(this).toString()
 
         renderBlocked()
+        refreshMedia()
+        renderStatus()
+        tvUnlockSummary.text = getString(R.string.vault_unlock_summary, Prefs.activeUnlockCount(this), Prefs.METHODS.size)
+        updateAlertPreview()
 
         tvTaps.text = Prefs.unlockTaps(this).toString()
         if (!recordingVolume) tvVolumeCode.text = volumeText(Prefs.volumeCode(this))
@@ -693,14 +1331,21 @@ class VaultActivity : Activity() {
         llBlocked.removeAllViews()
         val targets = Prefs.targets(this).sortedBy { AppCache.label(this, it).lowercase() }
         tvBlockedEmpty.visibility = if (targets.isEmpty()) View.VISIBLE else View.GONE
+        tvBlockedSummary.text = getString(
+            R.string.vault_blocked_summary,
+            targets.size,
+            getString(if (Prefs.isEnabled(this)) R.string.vault_word_on else R.string.vault_word_off)
+        )
         for (pkg in targets) {
             val row = layoutInflater.inflate(R.layout.row_app, llBlocked, false)
             row.findViewById<TextView>(R.id.tvLabel).text = AppCache.label(this, pkg)
+            row.findViewById<TextView>(R.id.tvPkg).text = pkg
             bindIcon(row.findViewById(R.id.ivIcon), pkg)
             row.findViewById<View>(R.id.btnRemove).setOnClickListener {
                 Prefs.setTargets(this, Prefs.targets(this) - pkg)
                 renderBlocked()
                 tvBlockedCount.text = Prefs.targets(this).size.toString()
+                updateAlertPreview()
             }
             llBlocked.addView(row)
         }
@@ -823,6 +1468,9 @@ class VaultActivity : Activity() {
         private const val DRAWER_WIDTH_DP = 280
         private const val MIN_VOLUME = 3
         private const val MAX_VOLUME = 6
+        private const val REQ_PICK = 41
+        private const val REQ_DELETE = 42
+        private const val HOLD_LOCK_MS = 3 * 60 * 1000L
         private const val MIN_CORNER = 4
         private const val MAX_CORNER = 6
     }

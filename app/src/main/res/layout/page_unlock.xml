@@ -12,6 +12,27 @@
         android:orientation="vertical"
         android:padding="20dp">
 
+        <LinearLayout
+            style="@style/Vault.Card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="14dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvUnlockSummary"
+                style="@style/Vault.CardTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+
+            <TextView
+                style="@style/Vault.Body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/vault_unlock_summary_desc" />
+        </LinearLayout>
+
         <!-- Tap and hold -->
         <LinearLayout
             style="@style/Vault.Card"
