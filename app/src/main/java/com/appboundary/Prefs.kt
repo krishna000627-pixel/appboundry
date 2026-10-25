@@ -12,6 +12,8 @@ object Prefs {
     private const val KEY_ALERT_TITLE = "alert_title"
     private const val KEY_ALERT_MESSAGE = "alert_message"
     private const val KEY_UNLOCK_TAPS = "unlock_taps"
+    private const val KEY_VOLUME_CODE = "code_volume"
+    private const val KEY_CORNER_CODE = "code_corner"
     private const val KEY_PIN_SALT = "pin_salt"
     private const val KEY_PIN_HASH = "pin_hash"
     private const val KEY_FAILS = "pin_fails"
@@ -22,6 +24,17 @@ object Prefs {
     private const val DEFAULT_TAPS = 3
     private const val MAX_FAILS = 5
     private const val LOCK_MS = 30_000L
+
+    // Ways to unlock the blocker screen.
+    const val METHOD_TAP_HOLD = "tap_hold"
+    const val METHOD_VOLUME = "volume"
+    const val METHOD_CORNER = "corner"
+    const val METHOD_TWO_FINGER = "two_finger"
+    val METHODS = listOf(METHOD_TAP_HOLD, METHOD_VOLUME, METHOD_CORNER, METHOD_TWO_FINGER)
+
+    // U = volume up, D = volume down. Corners: 1 top-left, 2 top-right, 3 bottom-left, 4 bottom-right.
+    private const val DEFAULT_VOLUME_CODE = "UDDU"
+    private const val DEFAULT_CORNER_CODE = "1432"
 
     private val DEFAULT_TARGETS = setOf("com.instagram.android")
 
@@ -59,13 +72,37 @@ object Prefs {
         editor.apply()
     }
 
-    // ---- Quick unlock --------------------------------------------------------
+    // ---- Unlock methods -------------------------------------------------------
+
+    fun unlockEnabled(context: Context, method: String): Boolean =
+        prefs(context).getBoolean("unlock_on_$method", true)
+
+    fun setUnlockEnabled(context: Context, method: String, enabled: Boolean) {
+        prefs(context).edit().putBoolean("unlock_on_$method", enabled).apply()
+    }
+
+    fun activeUnlockCount(context: Context): Int =
+        METHODS.count { unlockEnabled(context, it) }
 
     fun unlockTaps(context: Context): Int =
         prefs(context).getInt(KEY_UNLOCK_TAPS, DEFAULT_TAPS).coerceIn(MIN_TAPS, MAX_TAPS)
 
     fun setUnlockTaps(context: Context, taps: Int) {
         prefs(context).edit().putInt(KEY_UNLOCK_TAPS, taps.coerceIn(MIN_TAPS, MAX_TAPS)).apply()
+    }
+
+    fun volumeCode(context: Context): String =
+        prefs(context).getString(KEY_VOLUME_CODE, null)?.takeIf { it.isNotEmpty() } ?: DEFAULT_VOLUME_CODE
+
+    fun setVolumeCode(context: Context, code: String) {
+        prefs(context).edit().putString(KEY_VOLUME_CODE, code).apply()
+    }
+
+    fun cornerCode(context: Context): String =
+        prefs(context).getString(KEY_CORNER_CODE, null)?.takeIf { it.isNotEmpty() } ?: DEFAULT_CORNER_CODE
+
+    fun setCornerCode(context: Context, code: String) {
+        prefs(context).edit().putString(KEY_CORNER_CODE, code).apply()
     }
 
     // ---- Vault PIN -----------------------------------------------------------

@@ -7,7 +7,10 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
+import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowInsets
@@ -17,15 +20,32 @@ import android.widget.TextView
 
 class AlertActivity : Activity() {
 
+    /** Progress through a secret code (volume or corner). */
+    private class Matcher {
+        var progress = 0
+        var lastAt = 0L
+    }
+
     private lateinit var tvTitle: TextView
     private lateinit var tvMessage: TextView
     private lateinit var btnPositive: Button
 
     private var targetPackage: String? = null
     private var label: String = ""
+
+    // Way 1: taps on the black area, then hold the box.
     private var taps = 0
     private var lastTapAt = 0L
     private var downAt = 0L
+    private var multiTouch = false
+
+    // Ways 2 and 3: codes.
+    private val volumeMatcher = Matcher()
+    private val cornerMatcher = Matcher()
+
+    // Way 4: two fingers held on the black area.
+    private val handler = Handler(Looper.getMainLooper())
+    private val twoFingerUnlock = Runnable { unlockNow() }
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -38,11 +58,10 @@ class AlertActivity : Activity() {
         btnPositive = findViewById(R.id.btnPositive)
         btnPositive.setOnClickListener { goHomeAndFinish() }
 
-        // Secret, step 2: after the black-area taps, press and hold the box (not the OK button).
+        // Way 1, part 2: press and hold the box (not the OK button).
         findViewById<View>(R.id.card).setOnLongClickListener {
-            if (isArmed()) {
-                BoundaryAccessibilityService.grantSession(targetPackage)
-                finish()
+            if (Prefs.unlockEnabled(this, Prefs.METHOD_TAP_HOLD) && isArmed()) {
+                unlockNow()
                 true
             } else {
                 taps = 0
@@ -50,13 +69,8 @@ class AlertActivity : Activity() {
             }
         }
 
-        // Secret, step 1: quick taps anywhere on the black area outside the box.
-        findViewById<View>(R.id.root).setOnTouchListener { _, event ->
-            when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN -> downAt = event.eventTime
-                MotionEvent.ACTION_UP ->
-                    if (event.eventTime - downAt < TAP_MAX_MS) onBackgroundTap()
-            }
+        findViewById<View>(R.id.root).setOnTouchListener { v, event ->
+            handleTouch(v, event)
             true
         }
 
@@ -78,12 +92,29 @@ class AlertActivity : Activity() {
         }
     }
 
+    // Way 2: volume code. Volume still works normally while the code is typed.
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        if (event.repeatCount == 0 && Prefs.unlockEnabled(this, Prefs.METHOD_VOLUME)) {
+            val symbol = when (keyCode) {
+                KeyEvent.KEYCODE_VOLUME_UP -> 'U'
+                KeyEvent.KEYCODE_VOLUME_DOWN -> 'D'
+                else -> null
+            }
+            if (symbol != null && feed(volumeMatcher, Prefs.volumeCode(this), symbol)) {
+                unlockNow()
+                return true
+            }
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
     @Suppress("OVERRIDE_DEPRECATION")
     override fun onBackPressed() {
         goHomeAndFinish()
     }
 
     override fun onDestroy() {
+        handler.removeCallbacks(twoFingerUnlock)
         isShowing = false
         super.onDestroy()
     }
@@ -92,30 +123,92 @@ class AlertActivity : Activity() {
         targetPackage = intent.getStringExtra(EXTRA_PACKAGE)
         label = resolveLabel(targetPackage)
         taps = 0
+        volumeMatcher.progress = 0
+        cornerMatcher.progress = 0
         tvTitle.text = Prefs.alertTitle(this) ?: getString(R.string.alert_title)
         tvMessage.text = Prefs.alertMessage(this)?.replace("{app}", label)
             ?: getString(R.string.alert_message, label)
         btnPositive.setText(R.string.alert_ok)
     }
 
-    private fun onBackgroundTap() {
+    // ---- Touch: tap counting, corner code, two-finger hold ------------------
+
+    private fun handleTouch(v: View, event: MotionEvent) {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                downAt = event.eventTime
+                multiTouch = false
+            }
+            MotionEvent.ACTION_POINTER_DOWN -> {
+                multiTouch = true
+                if (event.pointerCount == 2 && Prefs.unlockEnabled(this, Prefs.METHOD_TWO_FINGER)) {
+                    handler.postDelayed(twoFingerUnlock, TWO_FINGER_HOLD_MS)
+                }
+            }
+            MotionEvent.ACTION_POINTER_UP -> handler.removeCallbacks(twoFingerUnlock)
+            MotionEvent.ACTION_CANCEL -> {
+                handler.removeCallbacks(twoFingerUnlock)
+                multiTouch = false
+            }
+            MotionEvent.ACTION_UP -> {
+                handler.removeCallbacks(twoFingerUnlock)
+                if (!multiTouch && event.eventTime - downAt < TAP_MAX_MS) onBackgroundTap(v, event)
+                multiTouch = false
+            }
+        }
+    }
+
+    private fun onBackgroundTap(v: View, event: MotionEvent) {
+        // Way 1: count the taps.
         val now = SystemClock.elapsedRealtime()
         if (now - lastTapAt > TAP_WINDOW_MS) taps = 0
         lastTapAt = now
         taps++
+
+        // Way 3: corner code, by screen quarter.
+        if (Prefs.unlockEnabled(this, Prefs.METHOD_CORNER)) {
+            val right = event.x >= v.width / 2f
+            val bottom = event.y >= v.height / 2f
+            val symbol = when {
+                !right && !bottom -> '1'
+                right && !bottom -> '2'
+                !right && bottom -> '3'
+                else -> '4'
+            }
+            if (feed(cornerMatcher, Prefs.cornerCode(this), symbol)) unlockNow()
+        }
     }
 
     private fun isArmed(): Boolean =
         taps >= Prefs.unlockTaps(this) &&
             SystemClock.elapsedRealtime() - lastTapAt <= ARM_WINDOW_MS
 
+    /** Advances a code; returns true when the whole code has been entered. */
+    private fun feed(matcher: Matcher, code: String, symbol: Char): Boolean {
+        if (code.isEmpty()) return false
+        val now = SystemClock.elapsedRealtime()
+        if (now - matcher.lastAt > TAP_WINDOW_MS) matcher.progress = 0
+        matcher.lastAt = now
+        matcher.progress = when {
+            code[matcher.progress] == symbol -> matcher.progress + 1
+            code[0] == symbol -> 1
+            else -> 0
+        }
+        if (matcher.progress == code.length) {
+            matcher.progress = 0
+            return true
+        }
+        return false
+    }
+
+    private fun unlockNow() {
+        BoundaryAccessibilityService.grantSession(targetPackage)
+        finish()
+    }
+
     private fun resolveLabel(pkg: String?): String {
         if (pkg == null) return getString(R.string.fallback_app_name)
-        return try {
-            packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
-        } catch (e: Exception) {
-            pkg
-        }
+        return AppCache.label(this, pkg)
     }
 
     private fun goHomeAndFinish() {
@@ -154,6 +247,7 @@ class AlertActivity : Activity() {
         private const val TAP_MAX_MS = 350L
         private const val TAP_WINDOW_MS = 2000L
         private const val ARM_WINDOW_MS = 3000L
+        private const val TWO_FINGER_HOLD_MS = 1500L
 
         /** True while an alert exists, so the service never launches a second one. */
         @Volatile

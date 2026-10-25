@@ -1,7 +1,10 @@
 package com.appboundary
 
 import android.accessibilityservice.AccessibilityService
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.os.Build
@@ -25,6 +28,7 @@ class BoundaryAccessibilityService : AccessibilityService() {
         super.onServiceConnected()
         instance = this
         unlockedPackage = null
+        registerPackageReceiver()
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -113,10 +117,56 @@ class BoundaryAccessibilityService : AccessibilityService() {
         return imm.enabledInputMethodList.any { it.packageName == pkg }
     }
 
+    private var packageReceiver: BroadcastReceiver? = null
+
+    /**
+     * Reacts to installs and uninstalls the moment they happen: new apps are added to the app
+     * list cache, and an uninstalled app is removed from the blocked list immediately.
+     */
+    private fun registerPackageReceiver() {
+        if (packageReceiver != null) return
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                val pkg = intent.data?.schemeSpecificPart ?: return
+                when (intent.action) {
+                    Intent.ACTION_PACKAGE_ADDED -> AppCache.onInstalled(context, pkg)
+                    Intent.ACTION_PACKAGE_REMOVED -> {
+                        // An update also sends "removed"; only a real uninstall counts.
+                        if (!intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)) {
+                            AppCache.onRemoved(context, pkg)
+                        }
+                    }
+                }
+            }
+        }
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_PACKAGE_ADDED)
+            addAction(Intent.ACTION_PACKAGE_REMOVED)
+            addDataScheme("package")
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(receiver, filter)
+        }
+        packageReceiver = receiver
+    }
+
+    private fun unregisterPackageReceiver() {
+        val receiver = packageReceiver ?: return
+        packageReceiver = null
+        try {
+            unregisterReceiver(receiver)
+        } catch (e: Exception) {
+            // Already unregistered.
+        }
+    }
+
     override fun onInterrupt() = Unit
 
     override fun onUnbind(intent: Intent?): Boolean {
         hideCover()
+        unregisterPackageReceiver()
         instance = null
         unlockedPackage = null
         return super.onUnbind(intent)
@@ -124,6 +174,7 @@ class BoundaryAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         hideCover()
+        unregisterPackageReceiver()
         instance = null
         unlockedPackage = null
         super.onDestroy()

@@ -78,352 +78,255 @@
         </LinearLayout>
     </ScrollView>
 
-    <!-- ===== Vault ===== -->
-    <ScrollView
-        android:id="@+id/content"
+    <!-- ===== Vault (header + pages + drawer + picker) ===== -->
+    <FrameLayout
+        android:id="@+id/vaultRoot"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:scrollbars="none"
         android:visibility="gone">
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="20dp">
+            android:layout_height="match_parent"
+            android:orientation="vertical">
 
-            <!-- Header -->
+            <!-- Header with the three-bar menu -->
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
+                android:layout_height="56dp"
                 android:gravity="center_vertical"
-                android:orientation="horizontal">
+                android:orientation="horizontal"
+                android:paddingStart="8dp"
+                android:paddingEnd="16dp">
 
-                <FrameLayout
+                <ImageView
+                    android:id="@+id/btnMenu"
                     android:layout_width="48dp"
                     android:layout_height="48dp"
-                    android:background="@drawable/bg_icon_tile">
+                    android:background="@drawable/bg_key_flat"
+                    android:clickable="true"
+                    android:contentDescription="@string/vault_menu"
+                    android:focusable="true"
+                    android:padding="12dp"
+                    android:src="@drawable/ic_menu" />
 
-                    <ImageView
-                        android:layout_width="28dp"
-                        android:layout_height="28dp"
-                        android:layout_gravity="center"
-                        android:contentDescription="@null"
-                        android:src="@drawable/ic_shield" />
-                </FrameLayout>
-
-                <LinearLayout
+                <TextView
+                    android:id="@+id/tvPageTitle"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="14dp"
+                    android:layout_marginStart="8dp"
                     android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/vault_title"
-                        android:textColor="@color/vault_text"
-                        android:textSize="26sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        style="@style/Vault.Body"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/vault_subtitle" />
-                </LinearLayout>
+                    android:textColor="@color/vault_text"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/btnLock"
                     style="@style/Vault.Button"
                     android:layout_width="wrap_content"
-                    android:layout_height="40dp"
+                    android:layout_height="36dp"
                     android:text="@string/vault_lock" />
             </LinearLayout>
 
-            <!-- Accessibility warning -->
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1">
+
+                <include layout="@layout/page_home" />
+                <include layout="@layout/page_blocked" />
+                <include layout="@layout/page_alert" />
+                <include layout="@layout/page_unlock" />
+                <include layout="@layout/page_security" />
+            </FrameLayout>
+        </LinearLayout>
+
+        <!-- Dim layer behind the drawer -->
+        <View
+            android:id="@+id/scrim"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#99000000"
+            android:clickable="true"
+            android:visibility="gone" />
+
+        <!-- Drawer -->
+        <LinearLayout
+            android:id="@+id/drawer"
+            android:layout_width="280dp"
+            android:layout_height="match_parent"
+            android:background="@drawable/bg_drawer"
+            android:clickable="true"
+            android:orientation="vertical"
+            android:paddingTop="24dp">
+
             <LinearLayout
-                android:id="@+id/cardAccess"
-                style="@style/Vault.Card"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
-                android:orientation="vertical"
-                android:visibility="gone">
-
-                <TextView
-                    style="@style/Vault.Body"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/vault_access_off"
-                    android:textColor="@color/vault_danger" />
-
-                <TextView
-                    android:id="@+id/btnAccess"
-                    style="@style/Vault.Button.Primary"
-                    android:layout_width="match_parent"
-                    android:layout_height="44dp"
-                    android:layout_marginTop="14dp"
-                    android:text="@string/vault_access_fix" />
-            </LinearLayout>
-
-            <!-- Focus mode -->
-            <LinearLayout
-                style="@style/Vault.Card"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
+                android:layout_marginStart="20dp"
+                android:layout_marginBottom="20dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        style="@style/Vault.CardTitle"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/vault_focus_title" />
-
-                    <TextView
-                        android:id="@+id/tvFocusState"
-                        style="@style/Vault.Body"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp" />
-                </LinearLayout>
-
-                <Switch
-                    android:id="@+id/switchFocus"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:thumbTint="@color/switch_thumb"
-                    android:trackTint="@color/switch_track" />
-            </LinearLayout>
-
-            <!-- Blocked apps -->
-            <LinearLayout
-                style="@style/Vault.Card"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
-                android:orientation="vertical">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        style="@style/Vault.CardTitle"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/vault_blocked_title" />
-
-                    <TextView
-                        android:id="@+id/btnAddApp"
-                        style="@style/Vault.Button"
-                        android:layout_width="wrap_content"
-                        android:layout_height="38dp"
-                        android:text="@string/vault_add_app" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/llBlocked"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:orientation="vertical" />
-
-                <TextView
-                    android:id="@+id/tvBlockedEmpty"
-                    style="@style/Vault.Body"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:text="@string/vault_blocked_empty" />
-            </LinearLayout>
-
-            <!-- Alert screen text -->
-            <LinearLayout
-                style="@style/Vault.Card"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
-                android:orientation="vertical">
-
-                <TextView
-                    style="@style/Vault.CardTitle"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/vault_alert_title" />
-
-                <EditText
-                    android:id="@+id/etTitle"
-                    style="@style/Vault.Input"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
-                    android:inputType="textCapSentences"
-                    android:singleLine="true" />
-
-                <EditText
-                    android:id="@+id/etMessage"
-                    style="@style/Vault.Input"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:gravity="top|start"
-                    android:inputType="textMultiLine|textCapSentences"
-                    android:minLines="3" />
-
-                <TextView
-                    style="@style/Vault.Body"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:text="@string/vault_alert_hint" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:id="@+id/btnReset"
-                        style="@style/Vault.Button"
-                        android:layout_width="0dp"
-                        android:layout_height="44dp"
-                        android:layout_weight="1"
-                        android:text="@string/vault_reset" />
-
-                    <TextView
-                        android:id="@+id/btnPreview"
-                        style="@style/Vault.Button"
-                        android:layout_width="0dp"
-                        android:layout_height="44dp"
-                        android:layout_marginStart="8dp"
-                        android:layout_weight="1"
-                        android:text="@string/vault_preview" />
-
-                    <TextView
-                        android:id="@+id/btnSave"
-                        style="@style/Vault.Button.Primary"
-                        android:layout_width="0dp"
-                        android:layout_height="44dp"
-                        android:layout_marginStart="8dp"
-                        android:layout_weight="1"
-                        android:text="@string/vault_save" />
-                </LinearLayout>
-            </LinearLayout>
-
-            <!-- Quick unlock -->
-            <LinearLayout
-                style="@style/Vault.Card"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
-                android:orientation="vertical">
-
-                <TextView
-                    style="@style/Vault.CardTitle"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/vault_unlock_title" />
-
-                <TextView
-                    style="@style/Vault.Body"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:text="@string/vault_unlock_desc" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        style="@style/Vault.Body"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/vault_taps"
-                        android:textColor="@color/vault_text"
-                        android:textSize="15sp" />
-
-                    <TextView
-                        android:id="@+id/btnTapsMinus"
-                        style="@style/Vault.Button"
-                        android:layout_width="44dp"
-                        android:layout_height="44dp"
-                        android:paddingStart="0dp"
-                        android:paddingEnd="0dp"
-                        android:text="-"
-                        android:textSize="20sp" />
-
-                    <TextView
-                        android:id="@+id/tvTaps"
-                        android:layout_width="48dp"
-                        android:layout_height="wrap_content"
-                        android:gravity="center"
-                        android:textColor="@color/vault_text"
-                        android:textSize="20sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/btnTapsPlus"
-                        style="@style/Vault.Button"
-                        android:layout_width="44dp"
-                        android:layout_height="44dp"
-                        android:paddingStart="0dp"
-                        android:paddingEnd="0dp"
-                        android:text="+"
-                        android:textSize="20sp" />
-                </LinearLayout>
-            </LinearLayout>
-
-            <!-- Security -->
-            <LinearLayout
-                style="@style/Vault.Card"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
-                android:orientation="vertical">
-
-                <TextView
-                    style="@style/Vault.CardTitle"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/vault_security_title" />
-
-                <TextView
-                    android:id="@+id/btnChangePin"
-                    style="@style/Vault.Button"
-                    android:layout_width="match_parent"
+                <FrameLayout
+                    android:layout_width="44dp"
                     android:layout_height="44dp"
-                    android:layout_marginTop="14dp"
-                    android:text="@string/vault_change_pin" />
+                    android:background="@drawable/bg_icon_tile">
+
+                    <ImageView
+                        android:layout_width="26dp"
+                        android:layout_height="26dp"
+                        android:layout_gravity="center"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_shield" />
+                </FrameLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="14dp"
+                    android:text="@string/vault_title"
+                    android:textColor="@color/vault_text"
+                    android:textSize="22sp"
+                    android:textStyle="bold" />
             </LinearLayout>
 
             <TextView
-                android:id="@+id/tvVersion"
-                style="@style/Vault.Body"
+                android:id="@+id/navHome"
+                style="@style/Vault.NavItem"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginStart="12dp"
+                android:layout_marginTop="2dp"
+                android:layout_marginEnd="12dp"
+                android:text="@string/vault_nav_home" />
+
+            <TextView
+                android:id="@+id/navBlocked"
+                style="@style/Vault.NavItem"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginStart="12dp"
+                android:layout_marginTop="2dp"
+                android:layout_marginEnd="12dp"
+                android:text="@string/vault_nav_blocked" />
+
+            <TextView
+                android:id="@+id/navAlert"
+                style="@style/Vault.NavItem"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginStart="12dp"
+                android:layout_marginTop="2dp"
+                android:layout_marginEnd="12dp"
+                android:text="@string/vault_nav_alert" />
+
+            <TextView
+                android:id="@+id/navUnlock"
+                style="@style/Vault.NavItem"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginStart="12dp"
+                android:layout_marginTop="2dp"
+                android:layout_marginEnd="12dp"
+                android:text="@string/vault_nav_unlock" />
+
+            <TextView
+                android:id="@+id/navSecurity"
+                style="@style/Vault.NavItem"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginStart="12dp"
+                android:layout_marginTop="2dp"
+                android:layout_marginEnd="12dp"
+                android:text="@string/vault_nav_security" />
+        </LinearLayout>
+
+        <!-- App picker (full screen layer) -->
+        <LinearLayout
+            android:id="@+id/pickerLayer"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/vault_bg"
+            android:clickable="true"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="8dp"
+                android:paddingEnd="16dp">
+
+                <ImageView
+                    android:id="@+id/btnPickerBack"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:background="@drawable/bg_key_flat"
+                    android:clickable="true"
+                    android:contentDescription="@string/vault_back"
+                    android:focusable="true"
+                    android:padding="12dp"
+                    android:src="@drawable/ic_back" />
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:text="@string/vault_add_apps"
+                    android:textColor="@color/vault_text"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <EditText
+                android:id="@+id/etSearch"
+                style="@style/Vault.Input"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
-                android:layout_marginBottom="12dp"
-                android:gravity="center" />
+                android:layout_marginStart="16dp"
+                android:layout_marginTop="4dp"
+                android:layout_marginEnd="16dp"
+                android:layout_marginBottom="8dp"
+                android:hint="@string/vault_search_hint"
+                android:imeOptions="actionSearch"
+                android:inputType="text"
+                android:singleLine="true" />
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1">
+
+                <ListView
+                    android:id="@+id/lvPicker"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:divider="@null"
+                    android:listSelector="@android:color/transparent"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:scrollbars="none" />
+
+                <TextView
+                    android:id="@+id/tvPickerEmpty"
+                    style="@style/Vault.Body"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:visibility="gone" />
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/btnPickerAdd"
+                style="@style/Vault.Button.Primary"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_margin="16dp"
+                android:text="@string/vault_select_apps" />
         </LinearLayout>
-    </ScrollView>
+    </FrameLayout>
 </FrameLayout>

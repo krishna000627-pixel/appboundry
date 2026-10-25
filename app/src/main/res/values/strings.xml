@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">AppBoundary</string>
-    <string name="tile_label">App Boundary</string>
+    <string name="app_name">Keyboard</string>
+    <string name="tile_label">Keyboard</string>
     <string name="tile_on">On</string>
     <string name="tile_off">Off</string>
 
@@ -12,13 +12,28 @@
     <string name="fallback_app_name">This app</string>
     <string name="service_description">Detects when a restricted app is opened and shows a focus alert. Enable it in Accessibility settings, then toggle it from Quick Settings.</string>
 
-    <!-- Vault -->
+    <!-- Vault: general -->
     <string name="vault_label">Vault</string>
     <string name="vault_title">Vault</string>
-    <string name="vault_subtitle">Private settings for AppBoundary</string>
     <string name="vault_lock">Lock</string>
+    <string name="vault_menu">Menu</string>
+    <string name="vault_back">Back</string>
     <string name="vault_backspace">Delete</string>
+    <string name="vault_remove">Remove</string>
+    <string name="vault_save">Save</string>
+    <string name="vault_saved">Saved</string>
+    <string name="vault_reset">Reset</string>
+    <string name="vault_preview">Preview</string>
+    <string name="vault_footer">Version %1$s</string>
 
+    <!-- Vault: pages -->
+    <string name="vault_nav_home">Home</string>
+    <string name="vault_nav_blocked">Blocked apps</string>
+    <string name="vault_nav_alert">Alert screen</string>
+    <string name="vault_nav_unlock">Unlock methods</string>
+    <string name="vault_nav_security">Security</string>
+
+    <!-- Vault: PIN -->
     <string name="vault_pin_enter_title">Enter PIN</string>
     <string name="vault_pin_enter_sub">Your vault is locked</string>
     <string name="vault_pin_create_title">Create a PIN</string>
@@ -30,33 +45,44 @@
     <string name="vault_pin_locked">Too many attempts. Try again in %1$d s</string>
     <string name="vault_pin_forgot">Forgot your PIN? Clear this app data in system settings to reset it.</string>
     <string name="vault_pin_changed">PIN updated</string>
+    <string name="vault_security_title">PIN</string>
+    <string name="vault_change_pin">Change PIN</string>
 
+    <!-- Vault: home -->
     <string name="vault_focus_title">Focus mode</string>
     <string name="vault_focus_on">Active. Blocked apps are covered.</string>
     <string name="vault_focus_off">Paused. Nothing is blocked.</string>
-
-    <string name="vault_access_off">Accessibility service is off. AppBoundary cannot see when a blocked app opens.</string>
+    <string name="vault_access_off">Accessibility service is off. It cannot see when a blocked app opens.</string>
     <string name="vault_access_fix">Open settings</string>
+    <string name="vault_tile_blocked">Blocked apps</string>
+    <string name="vault_tile_unlock">Unlock methods</string>
 
-    <string name="vault_blocked_title">Blocked apps</string>
+    <!-- Vault: blocked apps and picker -->
     <string name="vault_blocked_empty">No apps blocked yet.</string>
-    <string name="vault_add_app">Add app</string>
-    <string name="vault_no_apps">No other apps found</string>
+    <string name="vault_add_apps">Add apps</string>
+    <string name="vault_search_hint">Search apps</string>
+    <string name="vault_select_apps">Select apps</string>
+    <string name="vault_add_n">Add %1$d</string>
+    <string name="vault_picker_loading">Loading apps...</string>
+    <string name="vault_picker_none">No matching apps</string>
 
-    <string name="vault_alert_title">Alert screen</string>
+    <!-- Vault: alert screen -->
+    <string name="vault_alert_title">Alert text</string>
     <string name="vault_alert_hint">Leave a field empty to use the default. Write {app} where the app name should appear.</string>
-    <string name="vault_preview">Preview</string>
-    <string name="vault_save">Save</string>
-    <string name="vault_reset">Reset</string>
-    <string name="vault_saved">Saved</string>
-    <string name="vault_hint_title">Title</string>
 
-    <string name="vault_unlock_title">Quick unlock</string>
-    <string name="vault_unlock_desc">On the blocker screen, tap the black area outside the box this many times, then press and hold the box.</string>
+    <!-- Vault: unlock methods -->
     <string name="vault_taps">Taps</string>
-
-    <string name="vault_security_title">Security</string>
-    <string name="vault_change_pin">Change PIN</string>
-    <string name="vault_footer">AppBoundary v%1$s</string>
-    <string name="vault_remove">Remove</string>
+    <string name="vault_set_pattern">Set</string>
+    <string name="vault_listening">Press the volume buttons...</string>
+    <string name="vault_listening_tap">Tap the squares below...</string>
+    <string name="vault_need_more">Enter a few more steps first</string>
+    <string name="vault_code_saved">Code saved</string>
+    <string name="vault_m_taphold_title">Tap and hold</string>
+    <string name="vault_m_taphold_desc">On the blocker screen, tap the black area outside the box several times, then press and hold the box.</string>
+    <string name="vault_m_volume_title">Volume code</string>
+    <string name="vault_m_volume_desc">Press the volume buttons in this order while the blocker screen is showing.</string>
+    <string name="vault_m_corner_title">Corner code</string>
+    <string name="vault_m_corner_desc">Tap the four quarters of the screen in this order. Tap outside the box.</string>
+    <string name="vault_m_two_title">Two finger hold</string>
+    <string name="vault_m_two_desc">Touch the black area with two fingers and hold for about a second and a half.</string>
 </resources>
