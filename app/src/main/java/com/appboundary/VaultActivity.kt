@@ -23,6 +23,9 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.widget.SeekBar
+import android.view.WindowInsets
+import android.view.WindowInsetsController
+import android.graphics.Color
 import android.os.CountDownTimer
 import android.provider.Settings
 import android.service.quicksettings.TileService
@@ -637,7 +640,6 @@ class VaultActivity : Activity() {
 
     private fun bindExtras() {
         // Home
-        findViewById<View>(R.id.btnQuickHide).setOnClickListener { pickMedia() }
         findViewById<View>(R.id.btnQuickApps).setOnClickListener {
             showPage(Page.BLOCKED)
             openPicker()
@@ -1014,6 +1016,7 @@ class VaultActivity : Activity() {
         viewerCount = mediaItems.size
         viewerLayer.alpha = 1f
         viewerLayer.visibility = View.VISIBLE
+        enterFullScreen()
         setControls(true, false)
         pager.open(idx)
     }
@@ -1067,6 +1070,7 @@ class VaultActivity : Activity() {
     /** Tap on the picture: hide or show the title bar, buttons and play control. */
     private fun setControls(show: Boolean, animate: Boolean = true) {
         controlsVisible = show
+        applyBars(show)
         ui.removeCallbacks(autoHide)
         val isVideo = viewing?.video == true
         for (v in listOf(viewerTop, viewerBottom, btnPlay)) {
@@ -1179,6 +1183,47 @@ class VaultActivity : Activity() {
         pager.release()
         viewerLayer.visibility = View.GONE
         viewerLayer.alpha = 1f
+        exitFullScreen()
+    }
+
+    // Full-screen viewer: draw behind the system bars and hide them together with the controls.
+    private var fullScreen = false
+
+    private fun enterFullScreen() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || fullScreen) return
+        fullScreen = true
+        window.setDecorFitsSystemWindows(false)
+        window.statusBarColor = Color.TRANSPARENT
+        window.navigationBarColor = Color.TRANSPARENT
+        viewerLayer.setOnApplyWindowInsetsListener { _, insets ->
+            val bars = insets.getInsets(WindowInsets.Type.systemBars())
+            viewerTop.layoutParams = viewerTop.layoutParams.also { it.height = dp(72) + bars.top }
+            viewerTop.setPadding(dp(8), dp(8) + bars.top, dp(16), 0)
+            viewerBottom.setPadding(dp(16), dp(28), dp(16), dp(16) + bars.bottom)
+            insets
+        }
+        viewerLayer.requestApplyInsets()
+    }
+
+    private fun exitFullScreen() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || !fullScreen) return
+        fullScreen = false
+        viewerLayer.setOnApplyWindowInsetsListener(null)
+        window.insetsController?.show(WindowInsets.Type.systemBars())
+        window.setDecorFitsSystemWindows(true)
+        window.statusBarColor = getColor(R.color.vault_bg)
+        window.navigationBarColor = getColor(R.color.vault_bg)
+    }
+
+    private fun applyBars(show: Boolean) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || !fullScreen) return
+        val c = window.insetsController ?: return
+        if (show) {
+            c.show(WindowInsets.Type.systemBars())
+        } else {
+            c.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            c.hide(WindowInsets.Type.systemBars())
+        }
     }
 
     private fun restoreViewing() {
