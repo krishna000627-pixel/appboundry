@@ -23,6 +23,11 @@ class BoundaryAccessibilityService : AccessibilityService() {
     private var cover: View? = null
     private var lastTriggerAt = 0L
 
+    /** Last real app that came to the front (our own alert, the keyboard and the shade don't count). */
+    private var lastPkg: String? = null
+    private var relaunchCount = 0
+    private var relaunchWindowStart = 0L
+
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
@@ -35,6 +40,8 @@ class BoundaryAccessibilityService : AccessibilityService() {
 
         val pkg = event.packageName?.toString() ?: return
         if (pkg == packageName) return // our own alert window
+
+        if (!isTransientWindow(pkg)) lastPkg = pkg
 
         if (!Prefs.isEnabled(this)) {
             unlockedPackage = null
@@ -67,6 +74,36 @@ class BoundaryAccessibilityService : AccessibilityService() {
         } catch (e: Exception) {
             hideCover()
         }
+    }
+
+    /**
+     * The alert closed by itself without OK or an unlock. This happens when a blocked app is
+     * opened from a link: Android removes the alert as soon as the app's own screen opens on
+     * top of it, which used to leave the app wide open. If that app is still in front, block it again.
+     */
+    fun onAlertLost(target: String?) {
+        if (target == null) return
+        lastTriggerAt = 0L // the old debounce must not swallow the next event
+        handler.postDelayed({
+            if (!Prefs.isEnabled(this) || target !in Prefs.targets(this)) return@postDelayed
+            if (unlockedPackage == target || lastPkg != target || AlertActivity.isShowing) return@postDelayed
+
+            // Safety: never fight an app that keeps reopening itself over the alert.
+            val now = SystemClock.elapsedRealtime()
+            if (now - relaunchWindowStart > RELAUNCH_WINDOW_MS) {
+                relaunchWindowStart = now
+                relaunchCount = 0
+            }
+            if (++relaunchCount > MAX_RELAUNCHES) return@postDelayed
+
+            lastTriggerAt = now
+            showCover()
+            try {
+                startActivity(AlertActivity.createIntent(this, target))
+            } catch (e: Exception) {
+                hideCover()
+            }
+        }, RELAUNCH_DELAY_MS)
     }
 
     private fun showCover() {
@@ -165,9 +202,11 @@ class BoundaryAccessibilityService : AccessibilityService() {
 
     override fun onUnbind(intent: Intent?): Boolean {
         hideCover()
+        handler.removeCallbacksAndMessages(null)
         unregisterPackageReceiver()
         instance = null
         unlockedPackage = null
+        lastPkg = null
         return super.onUnbind(intent)
     }
 
@@ -183,6 +222,9 @@ class BoundaryAccessibilityService : AccessibilityService() {
         private const val DEBOUNCE_MS = 1500L
         private const val COOLDOWN_MS = 1000L
         private const val COVER_TIMEOUT_MS = 2500L
+        private const val RELAUNCH_DELAY_MS = 250L
+        private const val RELAUNCH_WINDOW_MS = 5000L
+        private const val MAX_RELAUNCHES = 3
         private const val SYSTEM_UI = "com.android.systemui"
 
         @Volatile

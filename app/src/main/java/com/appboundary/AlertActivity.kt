@@ -36,6 +36,9 @@ class AlertActivity : Activity() {
     /** Opened from the vault's Preview button: OK and unlock just close it and return to the vault. */
     private var preview = false
 
+    /** Set when the user ended the alert (OK, Back or an unlock). Otherwise Android closed it for us. */
+    private var closedByUser = false
+
     // Way 1: taps on the black area, then hold the box.
     private var taps = 0
     private var lastTapAt = 0L
@@ -119,7 +122,11 @@ class AlertActivity : Activity() {
     override fun onDestroy() {
         handler.removeCallbacks(twoFingerUnlock)
         isShowing = false
+        // Closed by the system (a blocked app opened over us, e.g. from a link): block it again.
+        val lost = isFinishing && !closedByUser && !preview
+        val target = targetPackage
         super.onDestroy()
+        if (lost) BoundaryAccessibilityService.instance?.onAlertLost(target)
     }
 
     private fun applyTarget(intent: Intent) {
@@ -206,6 +213,7 @@ class AlertActivity : Activity() {
     }
 
     private fun unlockNow() {
+        closedByUser = true
         if (preview) {
             returnToVault()
             return
@@ -229,6 +237,7 @@ class AlertActivity : Activity() {
     }
 
     private fun goHomeAndFinish() {
+        closedByUser = true
         if (preview) {
             returnToVault()
             return
