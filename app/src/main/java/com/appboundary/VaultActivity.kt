@@ -145,6 +145,7 @@ class VaultActivity : Activity() {
     private val autoHide = Runnable { if (controlsVisible) setControls(false) }
     private lateinit var tvViewerTitle: TextView
     private lateinit var tvViewerInfo: TextView
+    private lateinit var tvViewerSub: TextView
     private val mediaAdapter = MediaAdapter()
     private var allMedia: List<MediaVault.Item> = emptyList()
     private var mediaItems: List<MediaVault.Item> = emptyList()
@@ -385,6 +386,7 @@ class VaultActivity : Activity() {
         sheetPanel = findViewById(R.id.sheetPanel)
         llSheetList = findViewById(R.id.llSheetList)
         tvViewerTitle = findViewById(R.id.tvViewerTitle)
+        tvViewerSub = findViewById(R.id.tvViewerSub)
 
         llBlocked = findViewById(R.id.llBlocked)
         tvBlockedEmpty = findViewById(R.id.tvBlockedEmpty)
@@ -748,7 +750,7 @@ class VaultActivity : Activity() {
     // ---- Photos and videos --------------------------------------------------
 
     private fun bindMedia() {
-        cellPx = (resources.displayMetrics.widthPixels - dp(40) - dp(12)) / 3
+        cellPx = (resources.displayMetrics.widthPixels - dp(6)) / 4
         folderCellH = (((resources.displayMetrics.widthPixels - dp(40) - dp(6)) / 2) * 0.8f).toInt()
         gvMedia.numColumns = 2
         gvMedia.adapter = folderAdapter
@@ -782,6 +784,7 @@ class VaultActivity : Activity() {
         btnHideMedia.setOnClickListener { addDialog() }
         findViewById<View>(R.id.btnCleanOriginals).setOnClickListener { cleanOriginals() }
         tabAll.setOnClickListener { closeFolder() }
+        findViewById<View>(R.id.btnFolderBack).setOnClickListener { closeFolder() }
         btnSort.setOnClickListener {
             newestFirst = !newestFirst
             refreshMedia()
@@ -803,6 +806,7 @@ class VaultActivity : Activity() {
         pager.host = pagerHost
         btnPlay.setOnClickListener { toggleVideo() }
         findViewById<View>(R.id.btnViewerFolder).setOnClickListener { openSheet() }
+        findViewById<View>(R.id.btnViewerInfo).setOnClickListener { showViewerInfo() }
         sheetLayer.setOnClickListener { closeSheet() }
         seekVideo.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {
@@ -845,15 +849,23 @@ class VaultActivity : Activity() {
         if (inFolder == gridShowsFolders) {
             gridShowsFolders = !inFolder
             if (inFolder) {
-                gvMedia.numColumns = 3
+                gvMedia.numColumns = 4
+                gvMedia.horizontalSpacing = dp(2)
+                gvMedia.verticalSpacing = dp(2)
+                gvMedia.setPadding(0, 0, 0, dp(20))
                 gvMedia.adapter = mediaAdapter
             } else {
                 gvMedia.numColumns = 2
+                gvMedia.horizontalSpacing = dp(6)
+                gvMedia.verticalSpacing = dp(6)
+                gvMedia.setPadding(dp(20), 0, dp(20), dp(20))
                 gvMedia.adapter = folderAdapter
             }
         }
         folderAdapter.notifyDataSetChanged()
         val vis = if (inFolder) View.VISIBLE else View.GONE
+        findViewById<View>(R.id.llFolderHeader).visibility = vis
+        tvMediaCount.visibility = if (inFolder) View.GONE else View.VISIBLE
         tabAll.visibility = vis
         tabPhotos.visibility = View.GONE
         tabVideos.visibility = View.GONE
@@ -861,8 +873,8 @@ class VaultActivity : Activity() {
         findViewById<View>(R.id.tvMediaHint).visibility = vis
         val f = folderList.firstOrNull { it.key == openFolder }
         if (f != null) {
-            tabAll.text = "\u2039  " + f.label + "  " + mediaItems.size
-            styleTab(tabAll, true)
+            tabAll.text = f.label
+            findViewById<TextView>(R.id.tvMediaHint).text = getString(R.string.vault_items_n, mediaItems.size)
         }
     }
 
@@ -939,7 +951,14 @@ class VaultActivity : Activity() {
 
     private fun renderSelection() {
         llSelectBar.visibility = if (selectMode) View.VISIBLE else View.GONE
-        tvSelCount.text = getString(R.string.vault_sel_count, selected.size)
+        findViewById<View>(R.id.llSelectTop).visibility = if (selectMode) View.VISIBLE else View.GONE
+        findViewById<View>(R.id.llFolderHeader).visibility =
+            if (openFolder != null && !selectMode) View.VISIBLE else View.GONE
+        tvSelCount.text = when (selected.size) {
+            0 -> getString(R.string.vault_sel_none)
+            1 -> getString(R.string.vault_sel_one)
+            else -> getString(R.string.vault_sel_many, selected.size)
+        }
         syncVisibleCells()
     }
 
@@ -960,7 +979,7 @@ class VaultActivity : Activity() {
         check.visibility = if (selectMode) View.VISIBLE else View.GONE
         check.setBackgroundResource(if (picked) R.drawable.bg_check_circle else R.drawable.bg_check_ring)
         check.text = if (picked) getString(R.string.vault_media_check) else ""
-        val sc = if (picked) 0.9f else 1f
+        val sc = 1f
         if (animate) v.animate().scaleX(sc).scaleY(sc).setDuration(90).start() else {
             v.animate().cancel()
             v.scaleX = sc
@@ -1261,7 +1280,12 @@ class VaultActivity : Activity() {
         viewIndex = index
         viewing = item
         stopVideoUi()
-        tvViewerTitle.text = item.name
+        tvViewerTitle.text = when {
+            android.text.format.DateUtils.isToday(item.added) -> getString(R.string.vault_day_today)
+            android.text.format.DateUtils.isToday(item.added + 86400000L) -> getString(R.string.vault_day_yesterday)
+            else -> DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(item.added))
+        }
+        tvViewerSub.text = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(item.added))
         val type = getString(if (item.video) R.string.vault_type_video else R.string.vault_type_photo)
         val date = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(item.added))
         tvViewerInfo.text = getString(
@@ -1475,6 +1499,23 @@ class VaultActivity : Activity() {
             c.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             c.hide(WindowInsets.Type.systemBars())
         }
+    }
+
+    private fun showViewerInfo() {
+        val item = viewing ?: return
+        val type = getString(if (item.video) R.string.vault_type_video else R.string.vault_type_photo)
+        val date = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(item.added))
+        AlertDialog.Builder(this, R.style.Vault_Dialog)
+            .setTitle(R.string.vault_viewer_info_title)
+            .setMessage(
+                getString(
+                    R.string.vault_viewer_info_body,
+                    item.name, type, Formatter.formatFileSize(this, item.file.length()),
+                    date, viewIndex + 1, mediaItems.size
+                )
+            )
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
     }
 
     private fun restoreViewing() {
@@ -1736,7 +1777,12 @@ class VaultActivity : Activity() {
             }
             val iv = v.findViewById<ImageView>(R.id.ivThumb)
             val item = mediaItems[position]
-            v.findViewById<View>(R.id.tvPlay).visibility = if (item.video) View.VISIBLE else View.GONE
+            val badge = v.findViewById<TextView>(R.id.tvPlay)
+            badge.visibility = if (item.video) View.VISIBLE else View.GONE
+            if (item.video) {
+                badge.tag = item.id
+                MediaVault.duration(item) { t -> if (badge.tag == item.id) badge.text = t }
+            }
             bindCellState(v, item, false)
             if (!(iv.tag == item.id && iv.drawable != null)) {
                 iv.tag = item.id

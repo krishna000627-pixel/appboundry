@@ -4,9 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:paddingStart="20dp"
     android:paddingTop="20dp"
-    android:paddingEnd="20dp"
     android:visibility="gone">
 
     <!-- All files access (shown only while it is off) -->
@@ -15,6 +13,8 @@
         style="@style/Vault.Card"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginStart="20dp"
+        android:layout_marginEnd="20dp"
         android:layout_marginBottom="14dp"
         android:orientation="vertical"
         android:visibility="gone">
@@ -46,47 +46,68 @@
         style="@style/Vault.Body"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginStart="20dp"
         android:layout_marginTop="12dp" />
 
-    <!-- Three tabs: All / Photos / Videos, and sort -->
+    <!-- Folder page header, like the gallery: back, name, item count, sort -->
     <LinearLayout
+        android:id="@+id/llFolderHeader"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
         android:gravity="center_vertical"
-        android:orientation="horizontal">
+        android:orientation="horizontal"
+        android:paddingStart="8dp"
+        android:paddingTop="4dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="8dp"
+        android:visibility="gone">
 
-        <TextView
-            android:id="@+id/tabAll"
-            style="@style/Vault.NavItem"
-            android:layout_width="wrap_content"
-            android:layout_height="40dp"
-            android:paddingStart="14dp"
-            android:paddingEnd="14dp"
-            android:textSize="14sp" />
+        <ImageView
+            android:id="@+id/btnFolderBack"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_key_flat"
+            android:clickable="true"
+            android:contentDescription="@string/vault_back"
+            android:focusable="true"
+            android:padding="12dp"
+            android:src="@drawable/ic_back" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tabAll"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:singleLine="true"
+                android:textColor="@color/vault_text"
+                android:textSize="20sp" />
+
+            <TextView
+                android:id="@+id/tvMediaHint"
+                style="@style/Vault.Body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="14sp" />
+        </LinearLayout>
 
         <TextView
             android:id="@+id/tabPhotos"
-            style="@style/Vault.NavItem"
             android:layout_width="wrap_content"
-            android:layout_height="40dp"
-            android:paddingStart="14dp"
-            android:paddingEnd="14dp"
-            android:textSize="14sp" />
+            android:layout_height="wrap_content"
+            android:visibility="gone" />
 
         <TextView
             android:id="@+id/tabVideos"
-            style="@style/Vault.NavItem"
             android:layout_width="wrap_content"
-            android:layout_height="40dp"
-            android:paddingStart="14dp"
-            android:paddingEnd="14dp"
-            android:textSize="14sp" />
-
-        <View
-            android:layout_width="0dp"
-            android:layout_height="1dp"
-            android:layout_weight="1" />
+            android:layout_height="wrap_content"
+            android:visibility="gone" />
 
         <TextView
             android:id="@+id/btnSort"
@@ -99,15 +120,51 @@
             android:textSize="13sp" />
     </LinearLayout>
 
-    <TextView
-        android:id="@+id/tvMediaHint"
-        style="@style/Vault.Body"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
-        android:layout_marginBottom="8dp"
-        android:text="@string/vault_media_hint"
-        android:textSize="12sp" />
+    <!-- Selection top bar: Cancel, count, Select all -->
+    <LinearLayout
+        android:id="@+id/llSelectTop"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/btnSelCancel"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/bg_key_flat"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical|start"
+            android:text="@string/vault_media_cancel"
+            android:textColor="@color/vault_accent"
+            android:textSize="18sp" />
+
+        <TextView
+            android:id="@+id/tvSelCount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textColor="@color/vault_text"
+            android:textSize="18sp" />
+
+        <TextView
+            android:id="@+id/btnSelAll"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/bg_key_flat"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical|end"
+            android:text="@string/vault_sel_all_long"
+            android:textColor="@color/vault_accent"
+            android:textSize="18sp" />
+    </LinearLayout>
 
     <FrameLayout
         android:layout_width="match_parent"
@@ -121,7 +178,9 @@
             android:clipToPadding="false"
             android:horizontalSpacing="6dp"
             android:listSelector="@android:color/transparent"
-            android:numColumns="3"
+            android:numColumns="2"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
             android:paddingBottom="20dp"
             android:scrollbars="none"
             android:stretchMode="columnWidth"
@@ -137,93 +196,102 @@
             android:text="@string/vault_media_empty" />
     </FrameLayout>
 
-    <!-- Multi-select actions -->
+    <!-- Multi-select actions: icons with labels, like the gallery -->
     <LinearLayout
         android:id="@+id/llSelectBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
+        android:background="@color/vault_card"
+        android:orientation="horizontal"
+        android:paddingStart="8dp"
         android:paddingTop="8dp"
+        android:paddingEnd="8dp"
         android:paddingBottom="12dp"
         android:visibility="gone">
 
-        <TextView
-            android:id="@+id/tvSelCount"
-            style="@style/Vault.CardTitle"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:id="@+id/btnSelRestore"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
-            android:textSize="14sp" />
+            android:layout_weight="1"
+            android:background="@drawable/bg_key_flat"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp">
+
+            <ImageView
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_photos" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/vault_sel_restore"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp" />
+        </LinearLayout>
 
         <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
-        <TextView
-            android:id="@+id/btnSelAll"
-            style="@style/Vault.Button"
-            android:layout_width="0dp"
-            android:layout_height="44dp"
-            android:layout_weight="1"
-            android:paddingStart="2dp"
-            android:paddingEnd="2dp"
-            android:singleLine="true"
-            android:text="@string/vault_sel_all"
-            android:textSize="13sp" />
-
-        <TextView
             android:id="@+id/btnSelMove"
-            style="@style/Vault.Button"
             android:layout_width="0dp"
-            android:layout_height="44dp"
-            android:layout_marginStart="6dp"
+            android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:paddingStart="2dp"
-            android:paddingEnd="2dp"
-            android:singleLine="true"
-            android:text="@string/vault_sel_move"
-            android:textSize="13sp" />
+            android:background="@drawable/bg_key_flat"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp">
 
-        <TextView
-            android:id="@+id/btnSelRestore"
-            style="@style/Vault.Button"
-            android:layout_width="0dp"
-            android:layout_height="44dp"
-            android:layout_marginStart="6dp"
-            android:layout_weight="1"
-            android:paddingStart="2dp"
-            android:paddingEnd="2dp"
-            android:singleLine="true"
-            android:text="@string/vault_sel_restore"
-            android:textSize="13sp" />
+            <ImageView
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_folder" />
 
-        <TextView
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/vault_sel_move"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <LinearLayout
             android:id="@+id/btnSelDelete"
-            style="@style/Vault.Button"
             android:layout_width="0dp"
-            android:layout_height="44dp"
-            android:layout_marginStart="6dp"
+            android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:paddingStart="2dp"
-            android:paddingEnd="2dp"
-            android:singleLine="true"
-            android:text="@string/vault_media_delete"
-            android:textSize="13sp"
-            android:textColor="@color/vault_danger" />
+            android:background="@drawable/bg_key_flat"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp">
 
-        <TextView
-            android:id="@+id/btnSelCancel"
-            style="@style/Vault.Button"
-            android:layout_width="0dp"
-            android:layout_height="44dp"
-            android:layout_marginStart="6dp"
-            android:layout_weight="1"
-            android:paddingStart="2dp"
-            android:paddingEnd="2dp"
-            android:singleLine="true"
-            android:text="@string/vault_media_cancel"
-            android:textSize="13sp" />
+            <ImageView
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_delete"
+                android:tint="@color/vault_danger" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/vault_media_delete"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp" />
         </LinearLayout>
     </LinearLayout>
 </LinearLayout>

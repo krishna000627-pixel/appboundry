@@ -374,6 +374,33 @@ object MediaVault {
         }
     }
 
+    private val durations = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    /** Calls [cb] on the main thread with the video length as mm:ss. */
+    fun duration(item: Item, cb: (String) -> Unit) {
+        durations[item.id]?.let {
+            cb(it)
+            return
+        }
+        io.execute {
+            var text = ""
+            try {
+                val r = MediaMetadataRetriever()
+                try {
+                    r.setDataSource(item.file.absolutePath)
+                    val ms = r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+                    val sec = (ms + 500) / 1000
+                    text = String.format(java.util.Locale.US, "%02d:%02d", sec / 60, sec % 60)
+                } finally {
+                    r.release()
+                }
+            } catch (e: Exception) {
+            }
+            if (text.isNotEmpty()) durations[item.id] = text
+            main.post { if (text.isNotEmpty()) cb(text) }
+        }
+    }
+
     /** Full-screen photo, scaled down to roughly [maxPx]. Call off the main thread. */
     fun decode(item: Item, maxPx: Int): Bitmap? = decode(item.file, maxPx)
 
