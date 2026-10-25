@@ -1386,12 +1386,17 @@ class VaultActivity : Activity() {
         fitPager(animate)
     }
 
-    /** Like the gallery: the picture fills the page and the bars float over it. */
+    /** Buttons showing: the picture is a little zoomed out. Tap to hide them: it zooms in to full size. */
     private fun fitPager(animate: Boolean, retry: Boolean = true) {
+        val scale = if (controlsVisible) 0.94f else 1f
         pager.animate().cancel()
-        pager.scaleX = 1f
-        pager.scaleY = 1f
-        pager.translationY = 0f
+        if (animate) {
+            pager.animate().scaleX(scale).scaleY(scale).translationY(0f).setDuration(180).start()
+        } else {
+            pager.scaleX = scale
+            pager.scaleY = scale
+            pager.translationY = 0f
+        }
         btnPlay.translationY = 0f
     }
 
