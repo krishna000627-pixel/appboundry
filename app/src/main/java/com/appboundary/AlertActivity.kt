@@ -106,20 +106,24 @@ class AlertActivity : Activity() {
         }
     }
 
-    // Way 2: volume code. Volume still works normally while the code is typed.
+    // Way 2: volume code. While this unlock type is on, the volume keys are swallowed
+    // so the system volume box never shows and nothing reveals the code being typed.
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        if (event.repeatCount == 0 && isReady() && Prefs.unlockEnabled(this, Prefs.METHOD_VOLUME)) {
-            val symbol = when (keyCode) {
-                KeyEvent.KEYCODE_VOLUME_UP -> 'U'
-                KeyEvent.KEYCODE_VOLUME_DOWN -> 'D'
-                else -> null
+        val isVolumeKey = keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN
+        if (isVolumeKey && Prefs.unlockEnabled(this, Prefs.METHOD_VOLUME)) {
+            if (event.repeatCount == 0 && isReady()) {
+                val symbol = if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) 'U' else 'D'
+                if (feed(volumeMatcher, Prefs.volumeCode(this), symbol)) unlockNow()
             }
-            if (symbol != null && feed(volumeMatcher, Prefs.volumeCode(this), symbol)) {
-                unlockNow()
-                return true
-            }
+            return true
         }
         return super.onKeyDown(keyCode, event)
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        val isVolumeKey = keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN
+        if (isVolumeKey && Prefs.unlockEnabled(this, Prefs.METHOD_VOLUME)) return true
+        return super.onKeyUp(keyCode, event)
     }
 
     @Suppress("OVERRIDE_DEPRECATION")
