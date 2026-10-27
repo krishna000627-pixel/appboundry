@@ -19,7 +19,16 @@ import android.view.inputmethod.InputMethodManager
 class BoundaryAccessibilityService : AccessibilityService() {
 
     private val handler = Handler(Looper.getMainLooper())
-    private val coverTimeout = Runnable { hideCover() }
+    private val coverTimeout = Runnable {
+        hideCover()
+        // The alert never came up: do not leave the blocked app open, send the user home instead.
+        val front = lastPkg
+        if (!AlertActivity.isShowing && Prefs.isEnabled(this) && front != null &&
+            front in Prefs.targets(this) && front != unlockedPackage && !isTesting(front)
+        ) {
+            performGlobalAction(GLOBAL_ACTION_HOME)
+        }
+    }
     private var cover: View? = null
     private var lastTriggerAt = 0L
 
@@ -41,6 +50,7 @@ class BoundaryAccessibilityService : AccessibilityService() {
 
         val pkg = event.packageName?.toString() ?: return
         if (pkg == packageName) return // our own alert window
+        if (testPackage != null && pkg != testPackage && !isTransientWindow(pkg)) testPackage = null
         if (isTesting(pkg)) return // internet test: open the app without the cover, its internet stays cut
 
         // Check the blocked list first: asking the system about keyboards is slow and a blocked
@@ -91,9 +101,21 @@ class BoundaryAccessibilityService : AccessibilityService() {
     fun onAlertLost(target: String?) {
         if (target == null) return
         lastTriggerAt = 0L // the old debounce must not swallow the next event
+        // Cover the app at once; waiting for the delay below used to show it for a moment.
+        if (Prefs.isEnabled(this) && target in Prefs.targets(this) &&
+            unlockedPackage != target && !isTesting(target)
+        ) {
+            showCover()
+        }
         handler.postDelayed({
-            if (!Prefs.isEnabled(this) || target !in Prefs.targets(this)) return@postDelayed
-            if (unlockedPackage == target || lastPkg != target || AlertActivity.isShowing) return@postDelayed
+            if (!Prefs.isEnabled(this) || target !in Prefs.targets(this)) {
+                hideCover()
+                return@postDelayed
+            }
+            if (unlockedPackage == target || lastPkg != target || AlertActivity.isShowing) {
+                if (!AlertActivity.isShowing) hideCover()
+                return@postDelayed
+            }
 
             // Safety: never fight an app that keeps reopening itself over the alert.
             val now = SystemClock.elapsedRealtime()
@@ -101,7 +123,12 @@ class BoundaryAccessibilityService : AccessibilityService() {
                 relaunchWindowStart = now
                 relaunchCount = 0
             }
-            if (++relaunchCount > MAX_RELAUNCHES) return@postDelayed
+            if (++relaunchCount > MAX_RELAUNCHES) {
+                // The app keeps pushing the alert away. Never leave it open: send the user home.
+                hideCover()
+                performGlobalAction(GLOBAL_ACTION_HOME)
+                return@postDelayed
+            }
 
             lastTriggerAt = now
             showCover()
@@ -227,7 +254,7 @@ class BoundaryAccessibilityService : AccessibilityService() {
     }
 
     companion object {
-        private const val DEBOUNCE_MS = 1500L
+        private const val DEBOUNCE_MS = 400L
         private const val COOLDOWN_MS = 1000L
         private const val COVER_TIMEOUT_MS = 2500L
         private const val RELAUNCH_DELAY_MS = 250L
@@ -246,7 +273,7 @@ class BoundaryAccessibilityService : AccessibilityService() {
         @Volatile
         private var cooldownUntil = 0L
 
-        private const val TEST_MS = 2 * 60 * 1000L
+        private const val TEST_MS = 45 * 1000L
 
         @Volatile
         private var testPackage: String? = null
