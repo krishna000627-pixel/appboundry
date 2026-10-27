@@ -22,6 +22,8 @@ object Prefs {
     private const val KEY_LOCK_UNTIL = "pin_lock_until"
     private const val KEY_BLOCK_SHOTS = "block_screenshots"
     private const val KEY_THEME = "theme"
+    private const val KEY_DECOY_SALT = "decoy_salt"
+    private const val KEY_DECOY_HASH = "decoy_hash"
 
     const val MIN_TAPS = 2
     const val MAX_TAPS = 6
@@ -184,6 +186,44 @@ object Prefs {
         val salt = p.getString(KEY_PIN_SALT, null) ?: return false
         val stored = p.getString(KEY_PIN_HASH, null) ?: return false
         return MessageDigest.isEqual(hash(pin, salt).toByteArray(), stored.toByteArray())
+    }
+
+    // ---- Decoy PIN: opens a separate, empty vault -----------------------------
+
+    fun hasDecoyPin(context: Context): Boolean = prefs(context).contains(KEY_DECOY_HASH)
+
+    fun setDecoyPin(context: Context, pin: String) {
+        val salt = UUID.randomUUID().toString()
+        prefs(context).edit()
+            .putString(KEY_DECOY_SALT, salt)
+            .putString(KEY_DECOY_HASH, hash(pin, salt))
+            .apply()
+    }
+
+    fun clearDecoyPin(context: Context) {
+        prefs(context).edit().remove(KEY_DECOY_SALT).remove(KEY_DECOY_HASH).apply()
+    }
+
+    fun checkDecoyPin(context: Context, pin: String): Boolean {
+        val p = prefs(context)
+        val salt = p.getString(KEY_DECOY_SALT, null) ?: return false
+        val stored = p.getString(KEY_DECOY_HASH, null) ?: return false
+        return MessageDigest.isEqual(hash(pin, salt).toByteArray(), stored.toByteArray())
+    }
+
+    // ---- Blocker disguise, chosen per blocked app (0 = "not supported", the original) ----
+
+    const val DISGUISE_COUNT = 4
+
+    fun disguise(context: Context, pkg: String?): Int {
+        if (pkg == null) return 0
+        return prefs(context).getInt("disguise_$pkg", 0).coerceIn(0, DISGUISE_COUNT - 1)
+    }
+
+    fun setDisguise(context: Context, pkg: String, index: Int) {
+        val editor = prefs(context).edit()
+        if (index <= 0) editor.remove("disguise_$pkg") else editor.putInt("disguise_$pkg", index)
+        editor.apply()
     }
 
     /** Milliseconds left on the wrong-PIN lock, or 0. */

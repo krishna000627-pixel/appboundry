@@ -67,6 +67,7 @@ class VaultActivity : Activity() {
         BLOCKED(R.string.vault_nav_blocked),
         ALERT(R.string.vault_nav_alert),
         UNLOCK(R.string.vault_nav_unlock),
+        LOG(R.string.vault_nav_log),
         TILE(R.string.vault_nav_tile),
         SECURITY(R.string.vault_nav_security)
     }
@@ -219,6 +220,16 @@ class VaultActivity : Activity() {
     private var mode = Mode.UNLOCK
     private var currentPage = Page.HOME
     private var changingPin = false
+    private var settingDecoy = false
+    private var decoy = false
+
+    // Unlock log and decoy PIN
+    private lateinit var tvLogSummary: TextView
+    private lateinit var llLog: LinearLayout
+    private lateinit var tvLogEmpty: TextView
+    private lateinit var tvDecoyState: TextView
+    private lateinit var btnDecoySet: TextView
+    private lateinit var btnDecoyRemove: TextView
     private var drawerOpen = false
     private var rendering = false
     private var firstPin: String? = null
@@ -312,10 +323,13 @@ class VaultActivity : Activity() {
             pickerLayer.visibility == View.VISIBLE -> closePicker()
             drawerOpen -> closeDrawer(true)
             gate.visibility == View.VISIBLE && changingPin -> {
+                val wasDecoy = settingDecoy
                 changingPin = false
+                settingDecoy = false
                 openVault()
+                if (wasDecoy) showPage(Page.SECURITY)
             }
-            vaultRoot.visibility == View.VISIBLE && currentPage != Page.HOME -> showPage(Page.HOME)
+            vaultRoot.visibility == View.VISIBLE && !decoy && currentPage != Page.HOME -> showPage(Page.HOME)
             else -> super.onBackPressed()
         }
     }
@@ -363,6 +377,7 @@ class VaultActivity : Activity() {
             Page.BLOCKED to findViewById<View>(R.id.pageBlocked),
             Page.ALERT to findViewById<View>(R.id.pageAlert),
             Page.UNLOCK to findViewById<View>(R.id.pageUnlock),
+            Page.LOG to findViewById<View>(R.id.pageLog),
             Page.TILE to findViewById<View>(R.id.pageTile),
             Page.SECURITY to findViewById<View>(R.id.pageSecurity)
         )
@@ -372,6 +387,7 @@ class VaultActivity : Activity() {
             Page.BLOCKED to findViewById<TextView>(R.id.navBlocked),
             Page.ALERT to findViewById<TextView>(R.id.navAlert),
             Page.UNLOCK to findViewById<TextView>(R.id.navUnlock),
+            Page.LOG to findViewById<TextView>(R.id.navLog),
             Page.TILE to findViewById<TextView>(R.id.navTile),
             Page.SECURITY to findViewById<TextView>(R.id.navSecurity)
         )
@@ -444,6 +460,13 @@ class VaultActivity : Activity() {
         btnCornerSet = findViewById(R.id.btnCornerSet)
         llCornerPad = findViewById(R.id.llCornerPad)
 
+        tvLogSummary = findViewById(R.id.tvLogSummary)
+        llLog = findViewById(R.id.llLog)
+        tvLogEmpty = findViewById(R.id.tvLogEmpty)
+        tvDecoyState = findViewById(R.id.tvDecoyState)
+        btnDecoySet = findViewById(R.id.btnDecoySet)
+        btnDecoyRemove = findViewById(R.id.btnDecoyRemove)
+
         pickerLayer = findViewById(R.id.pickerLayer)
         etSearch = findViewById(R.id.etSearch)
         lvPicker = findViewById(R.id.lvPicker)
@@ -456,6 +479,10 @@ class VaultActivity : Activity() {
     private fun showGate(newMode: Mode) {
         mode = newMode
         entered.clear()
+        // Locking always leaves the decoy vault and points storage back at the real one.
+        decoy = false
+        MediaVault.decoy = false
+        if (newMode == Mode.UNLOCK) settingDecoy = false
         if (newMode != Mode.CONFIRM) firstPin = null
         stopRecording()
         closeDrawer(false)
@@ -474,8 +501,12 @@ class VaultActivity : Activity() {
     private fun setGateTexts() {
         val texts = when (mode) {
             Mode.UNLOCK -> Pair(R.string.vault_pin_enter_title, R.string.vault_pin_enter_sub)
-            Mode.CREATE -> Pair(R.string.vault_pin_create_title, R.string.vault_pin_create_sub)
-            Mode.CONFIRM -> Pair(R.string.vault_pin_confirm_title, R.string.vault_pin_confirm_sub)
+            Mode.CREATE ->
+                if (settingDecoy) Pair(R.string.vault_decoy_create_title, R.string.vault_decoy_create_sub)
+                else Pair(R.string.vault_pin_create_title, R.string.vault_pin_create_sub)
+            Mode.CONFIRM ->
+                if (settingDecoy) Pair(R.string.vault_decoy_confirm_title, R.string.vault_pin_confirm_sub)
+                else Pair(R.string.vault_pin_confirm_title, R.string.vault_pin_confirm_sub)
         }
         tvGateTitle.setText(texts.first)
         setSub(texts.second, false)
@@ -585,6 +616,9 @@ class VaultActivity : Activity() {
                 if (Prefs.checkPin(this, pin)) {
                     Prefs.resetFails(this)
                     openVault()
+                } else if (Prefs.hasDecoyPin(this) && Prefs.checkDecoyPin(this, pin)) {
+                    Prefs.resetFails(this)
+                    openVault(true)
                 } else {
                     val lockMs = Prefs.registerFail(this)
                     reject()
@@ -592,6 +626,16 @@ class VaultActivity : Activity() {
                 }
             }
             Mode.CREATE -> {
+                if (changingPin && settingDecoy && Prefs.checkPin(this, pin)) {
+                    reject()
+                    setSub(R.string.vault_decoy_same, true)
+                    return
+                }
+                if (changingPin && !settingDecoy && Prefs.hasDecoyPin(this) && Prefs.checkDecoyPin(this, pin)) {
+                    reject()
+                    setSub(R.string.vault_pin_same_decoy, true)
+                    return
+                }
                 firstPin = pin
                 mode = Mode.CONFIRM
                 entered.clear()
@@ -600,12 +644,20 @@ class VaultActivity : Activity() {
             }
             Mode.CONFIRM -> {
                 if (pin == firstPin) {
-                    Prefs.setPin(this, pin)
-                    if (changingPin) {
-                        Toast.makeText(this, R.string.vault_pin_changed, Toast.LENGTH_SHORT).show()
+                    val toSecurity = changingPin && settingDecoy
+                    if (settingDecoy) {
+                        Prefs.setDecoyPin(this, pin)
+                        Toast.makeText(this, R.string.vault_decoy_saved, Toast.LENGTH_SHORT).show()
+                    } else {
+                        Prefs.setPin(this, pin)
+                        if (changingPin) {
+                            Toast.makeText(this, R.string.vault_pin_changed, Toast.LENGTH_SHORT).show()
+                        }
                     }
                     changingPin = false
+                    settingDecoy = false
                     openVault()
+                    if (toSecurity) showPage(Page.SECURITY)
                 } else {
                     reject()
                     firstPin = null
@@ -832,17 +884,23 @@ class VaultActivity : Activity() {
         }
         findViewById<View>(R.id.btnMore).setOnClickListener {
             val sort = getString(if (newestFirst) R.string.vault_more_sort_old else R.string.vault_more_sort_new)
-            AlertDialog.Builder(this, R.style.Vault_Dialog)
-                .setItems(arrayOf(getString(R.string.vault_more_select), sort)) { _, which ->
-                    if (which == 0) {
-                        if (mediaItems.isNotEmpty()) {
-                            selectMode = true
-                            renderSelection()
-                        }
-                    } else {
-                        btnSort.performClick()
-                    }
+            val labels = ArrayList<String>()
+            val actions = ArrayList<() -> Unit>()
+            if (decoy) {
+                labels.add(getString(R.string.vault_media_hide))
+                actions.add { addDialog() }
+            }
+            labels.add(getString(R.string.vault_more_select))
+            actions.add {
+                if (mediaItems.isNotEmpty()) {
+                    selectMode = true
+                    renderSelection()
                 }
+            }
+            labels.add(sort)
+            actions.add { btnSort.performClick() }
+            AlertDialog.Builder(this, R.style.Vault_Dialog)
+                .setItems(labels.toTypedArray()) { _, which -> actions[which]() }
                 .show()
         }
         btnSort.setOnClickListener {
@@ -971,7 +1029,13 @@ class VaultActivity : Activity() {
         tvStatusStorage.text = size
         val folderEmpty = openFolder != null && mediaItems.isEmpty()
         tvMediaEmpty.visibility = if (allMedia.isEmpty() || folderEmpty) View.VISIBLE else View.GONE
-        tvMediaEmpty.setText(if (allMedia.isEmpty()) R.string.vault_media_empty else R.string.vault_folder_empty)
+        tvMediaEmpty.setText(
+            if (allMedia.isEmpty()) {
+                if (decoy) R.string.vault_media_empty_decoy else R.string.vault_media_empty
+            } else {
+                R.string.vault_folder_empty
+            }
+        )
         tvHomeMediaCount.text = allMedia.size.toString()
         renderSelection()
 
@@ -1852,13 +1916,23 @@ class VaultActivity : Activity() {
 
     // ---- Vault shell: pages and drawer --------------------------------------
 
-    private fun openVault() {
+    private fun openVault(asDecoy: Boolean = false) {
         lockTimer?.cancel()
         entered.clear()
+        decoy = asDecoy
+        MediaVault.decoy = asDecoy // all photo storage now points at the real or the decoy store
+        openFolder = null
+        searchQuery = ""
         gate.visibility = View.GONE
         vaultRoot.visibility = View.VISIBLE
         vaultRoot.alpha = 0f
         vaultRoot.animate().alpha(1f).setDuration(220).start()
+        findViewById<View>(R.id.btnMenu).visibility = if (asDecoy) View.GONE else View.VISIBLE
+        if (asDecoy) {
+            // Only an ordinary photo vault: no settings, blocked apps or status.
+            showPage(Page.PHOTOS)
+            return
+        }
         loadAlertTexts()
         loadTileName()
         showPage(Page.HOME)
@@ -1984,7 +2058,30 @@ class VaultActivity : Activity() {
         btnDark.setOnClickListener { val was = Prefs.isDark(this); Prefs.setDark(this, true); if (!was) recreate() }
         findViewById<View>(R.id.btnChangePin).setOnClickListener {
             changingPin = true
+            settingDecoy = false
             showGate(Mode.CREATE)
+        }
+        btnDecoySet.setOnClickListener {
+            changingPin = true
+            settingDecoy = true
+            showGate(Mode.CREATE)
+        }
+        btnDecoyRemove.setOnClickListener {
+            Prefs.clearDecoyPin(this)
+            Toast.makeText(this, R.string.vault_decoy_removed, Toast.LENGTH_SHORT).show()
+            refreshAll()
+        }
+        findViewById<View>(R.id.btnLogClear).setOnClickListener {
+            if (UnlockLog.list(this).isEmpty()) return@setOnClickListener
+            AlertDialog.Builder(this, R.style.Vault_Dialog)
+                .setTitle(R.string.vault_log_clear_title)
+                .setMessage(R.string.vault_log_clear_msg)
+                .setNegativeButton(R.string.vault_media_cancel, null)
+                .setPositiveButton(R.string.vault_log_clear) { _, _ ->
+                    UnlockLog.clear(this)
+                    renderLog()
+                }
+                .show()
         }
         val version = try {
             packageManager.getPackageInfo(packageName, 0).versionName ?: ""
@@ -2011,6 +2108,8 @@ class VaultActivity : Activity() {
         renderBlocked()
         refreshMedia()
         renderStatus()
+        renderDecoyCard()
+        if (currentPage == Page.LOG) renderLog()
         tvUnlockSummary.text = getString(R.string.vault_unlock_summary, Prefs.activeUnlockCount(this), Prefs.METHODS.size)
         updateAlertPreview()
 
@@ -2234,6 +2333,10 @@ class VaultActivity : Activity() {
             row.findViewById<TextView>(R.id.tvLabel).text = AppCache.label(this, pkg)
             row.findViewById<TextView>(R.id.tvPkg).text = pkg
             bindIcon(row.findViewById(R.id.ivIcon), pkg)
+            row.findViewById<TextView>(R.id.tvDisguise).text = getString(
+                R.string.vault_disguise_row, disguiseName(Prefs.disguise(this, pkg))
+            )
+            row.setOnClickListener { chooseDisguise(pkg) }
             row.findViewById<View>(R.id.btnRemove).setOnClickListener {
                 Prefs.setTargets(this, Prefs.targets(this) - pkg)
                 renderBlocked()
@@ -2242,6 +2345,69 @@ class VaultActivity : Activity() {
             }
             llBlocked.addView(row)
         }
+    }
+
+    private fun disguiseName(index: Int): String = getString(
+        when (index) {
+            1 -> R.string.vault_dg_1
+            2 -> R.string.vault_dg_2
+            3 -> R.string.vault_dg_3
+            else -> R.string.vault_dg_0
+        }
+    )
+
+    /** Pick which fake message covers one blocked app; Preview shows it without saving. */
+    private fun chooseDisguise(pkg: String) {
+        var sel = Prefs.disguise(this, pkg)
+        val names = Array(Prefs.DISGUISE_COUNT) { disguiseName(it) }
+        AlertDialog.Builder(this, R.style.Vault_Dialog)
+            .setTitle(R.string.vault_disguise_title)
+            .setSingleChoiceItems(names, sel) { _, which -> sel = which }
+            .setNegativeButton(R.string.vault_media_cancel, null)
+            .setNeutralButton(R.string.vault_preview) { _, _ ->
+                // The preview takes the screen; keep the vault unlocked so OK can return here.
+                holdLockUntil = System.currentTimeMillis() + HOLD_LOCK_MS
+                startActivity(AlertActivity.createIntent(this, pkg, true, sel))
+            }
+            .setPositiveButton(R.string.vault_disguise_save) { _, _ ->
+                Prefs.setDisguise(this, pkg, sel)
+                renderBlocked()
+            }
+            .show()
+    }
+
+    // ---- Unlock log and decoy card ------------------------------------------
+
+    private fun methodName(method: String): String = getString(
+        when (method) {
+            Prefs.METHOD_VOLUME -> R.string.vault_m_volume_title
+            Prefs.METHOD_CORNER -> R.string.vault_m_corner_title
+            Prefs.METHOD_TWO_FINGER -> R.string.vault_m_two_title
+            else -> R.string.vault_m_taphold_title
+        }
+    )
+
+    private fun renderLog() {
+        val entries = UnlockLog.list(this)
+        tvLogSummary.text = getString(R.string.vault_log_summary, entries.size)
+        tvLogEmpty.visibility = if (entries.isEmpty()) View.VISIBLE else View.GONE
+        llLog.removeAllViews()
+        val fmt = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
+        for (e in entries) {
+            val row = layoutInflater.inflate(R.layout.row_log, llLog, false)
+            row.findViewById<TextView>(R.id.tvLogApp).text = AppCache.label(this, e.pkg)
+            row.findViewById<TextView>(R.id.tvLogInfo).text = getString(
+                R.string.vault_log_row, methodName(e.method), fmt.format(Date(e.time))
+            )
+            llLog.addView(row)
+        }
+    }
+
+    private fun renderDecoyCard() {
+        val on = Prefs.hasDecoyPin(this)
+        tvDecoyState.setText(if (on) R.string.vault_decoy_on else R.string.vault_decoy_off)
+        btnDecoySet.setText(if (on) R.string.vault_decoy_change else R.string.vault_decoy_set)
+        btnDecoyRemove.visibility = if (on) View.VISIBLE else View.GONE
     }
 
     /** Shows a cached icon at once; otherwise loads it off the main thread. */

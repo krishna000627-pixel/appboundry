@@ -139,6 +139,7 @@
                 <include layout="@layout/page_blocked" />
                 <include layout="@layout/page_alert" />
                 <include layout="@layout/page_unlock" />
+                <include layout="@layout/page_log" />
                 <include layout="@layout/page_tile" />
                 <include layout="@layout/page_security" />
             </FrameLayout>
@@ -243,6 +244,16 @@
                 android:layout_marginTop="2dp"
                 android:layout_marginEnd="12dp"
                 android:text="@string/vault_nav_unlock" />
+
+            <TextView
+                android:id="@+id/navLog"
+                style="@style/Vault.NavItem"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginStart="12dp"
+                android:layout_marginTop="2dp"
+                android:layout_marginEnd="12dp"
+                android:text="@string/vault_nav_log" />
 
             <TextView
                 android:id="@+id/navTile"

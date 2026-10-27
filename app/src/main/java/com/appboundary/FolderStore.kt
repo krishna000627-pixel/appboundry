@@ -8,8 +8,10 @@ import org.json.JSONObject
 object FolderStore {
 
     private const val SP = "appboundary_folders"
+    private const val SP_DECOY = "appboundary_folders_decoy"
 
-    private fun sp(c: Context) = c.applicationContext.getSharedPreferences(SP, Context.MODE_PRIVATE)
+    private fun sp(c: Context) =
+        c.applicationContext.getSharedPreferences(if (MediaVault.decoy) SP_DECOY else SP, Context.MODE_PRIVATE)
 
     fun names(c: Context): List<String> {
         val arr = try {

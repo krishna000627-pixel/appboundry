@@ -9,6 +9,13 @@
     <string name="alert_title">App Not Supported</string>
     <string name="alert_message">%1$s is no longer compatible with your device architecture or system version.</string>
     <string name="alert_ok">OK</string>
+    <string name="dg_stop_title">%1$s keeps stopping</string>
+    <string name="dg_close_app">Close app</string>
+    <string name="dg_app_info">App info</string>
+    <string name="dg_na_title">App unavailable</string>
+    <string name="dg_na_msg">%1$s isn\'t available in your country or region.</string>
+    <string name="dg_cant_title">Can\'t open %1$s</string>
+    <string name="dg_cant_msg">Something went wrong. Please try again later.</string>
     <string name="fallback_app_name">This app</string>
     <string name="service_description">Detects when a restricted app is opened and shows a camouflage alert. Enable it in Accessibility settings, then toggle it from Quick Settings.</string>
 
@@ -45,6 +52,40 @@
     <string name="tile_icon_cloud">Cloud</string>
     <string name="tile_icon_gear">Settings</string>
     <string name="vault_tile_preview_label">Live preview</string>
+
+    <!-- Vault: unlock log, disguises, decoy PIN -->
+    <string name="vault_nav_log">Unlock log</string>
+    <string name="vault_log_summary">%1$d unlocks recorded</string>
+    <string name="vault_log_desc">Every time the blocker screen was unlocked: which app, which method, and when. Newest first. The last 200 are kept.</string>
+    <string name="vault_log_empty">Nothing unlocked yet.</string>
+    <string name="vault_log_clear">Clear log</string>
+    <string name="vault_log_clear_title">Clear the unlock log?</string>
+    <string name="vault_log_clear_msg">All recorded unlocks will be erased.</string>
+    <string name="vault_log_row">%1$s \u00B7 %2$s</string>
+    <string name="vault_disguise_hint">Tap an app to choose which fake message covers it.</string>
+    <string name="vault_disguise_title">Blocker disguise</string>
+    <string name="vault_disguise_row">Disguise: %1$s</string>
+    <string name="vault_disguise_save">Save</string>
+    <string name="vault_dg_0">Not supported</string>
+    <string name="vault_dg_1">App keeps stopping</string>
+    <string name="vault_dg_2">Not available in region</string>
+    <string name="vault_dg_3">Can\'t open</string>
+    <string name="vault_alert_hint_dg">The text above is used by the "Not supported" disguise only.</string>
+    <string name="vault_decoy_title">Decoy PIN</string>
+    <string name="vault_decoy_desc">A second PIN that opens a separate, empty vault with only photos and videos. Your real vault and settings stay hidden. Use it if someone makes you open the vault.</string>
+    <string name="vault_decoy_set">Set decoy PIN</string>
+    <string name="vault_decoy_change">Change decoy PIN</string>
+    <string name="vault_decoy_remove">Remove</string>
+    <string name="vault_decoy_on">Decoy PIN is on</string>
+    <string name="vault_decoy_off">Decoy PIN is off</string>
+    <string name="vault_decoy_create_title">Create decoy PIN</string>
+    <string name="vault_decoy_create_sub">Choose 4 digits, different from your real PIN</string>
+    <string name="vault_decoy_confirm_title">Confirm decoy PIN</string>
+    <string name="vault_decoy_same">Must be different from your real PIN</string>
+    <string name="vault_pin_same_decoy">Must be different from your decoy PIN</string>
+    <string name="vault_decoy_saved">Decoy PIN saved</string>
+    <string name="vault_decoy_removed">Decoy PIN removed</string>
+    <string name="vault_media_empty_decoy">Nothing hidden yet.\nUse the menu at the top to add photos and videos.</string>
 
     <!-- Vault: PIN -->
     <string name="vault_pin_enter_title">Enter PIN</string>

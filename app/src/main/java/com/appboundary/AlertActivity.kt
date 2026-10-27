@@ -32,6 +32,7 @@ class AlertActivity : Activity() {
     private lateinit var tvTitle: TextView
     private lateinit var tvMessage: TextView
     private lateinit var btnPositive: Button
+    private lateinit var btnNeutral: Button
 
     private var targetPackage: String? = null
     private var label: String = ""
@@ -58,7 +59,7 @@ class AlertActivity : Activity() {
 
     // Way 4: two fingers held on the black area.
     private val handler = Handler(Looper.getMainLooper())
-    private val twoFingerUnlock = Runnable { if (isReady() && gestureOk && multiTouch) unlockNow() }
+    private val twoFingerUnlock = Runnable { if (isReady() && gestureOk && multiTouch) unlockNow(Prefs.METHOD_TWO_FINGER) }
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -69,12 +70,14 @@ class AlertActivity : Activity() {
         tvTitle = findViewById(R.id.tvTitle)
         tvMessage = findViewById(R.id.tvMessage)
         btnPositive = findViewById(R.id.btnPositive)
+        btnNeutral = findViewById(R.id.btnNeutral)
         btnPositive.setOnClickListener { goHomeAndFinish() }
+        btnNeutral.setOnClickListener { goHomeAndFinish() }
 
         // Way 1, part 2: press and hold the box (not the OK button).
         findViewById<View>(R.id.card).setOnLongClickListener {
             if (isReady() && Prefs.unlockEnabled(this, Prefs.METHOD_TAP_HOLD) && isArmed()) {
-                unlockNow()
+                unlockNow(Prefs.METHOD_TAP_HOLD)
                 true
             } else {
                 taps = 0
@@ -106,24 +109,20 @@ class AlertActivity : Activity() {
         }
     }
 
-    // Way 2: volume code. While this unlock type is on, the volume keys are swallowed
-    // so the system volume box never shows and nothing reveals the code being typed.
+    // Way 2: volume code. Volume still works normally while the code is typed.
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        val isVolumeKey = keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN
-        if (isVolumeKey && Prefs.unlockEnabled(this, Prefs.METHOD_VOLUME)) {
-            if (event.repeatCount == 0 && isReady()) {
-                val symbol = if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) 'U' else 'D'
-                if (feed(volumeMatcher, Prefs.volumeCode(this), symbol)) unlockNow()
+        if (event.repeatCount == 0 && isReady() && Prefs.unlockEnabled(this, Prefs.METHOD_VOLUME)) {
+            val symbol = when (keyCode) {
+                KeyEvent.KEYCODE_VOLUME_UP -> 'U'
+                KeyEvent.KEYCODE_VOLUME_DOWN -> 'D'
+                else -> null
             }
-            return true
+            if (symbol != null && feed(volumeMatcher, Prefs.volumeCode(this), symbol)) {
+                unlockNow(Prefs.METHOD_VOLUME)
+                return true
+            }
         }
         return super.onKeyDown(keyCode, event)
-    }
-
-    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
-        val isVolumeKey = keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN
-        if (isVolumeKey && Prefs.unlockEnabled(this, Prefs.METHOD_VOLUME)) return true
-        return super.onKeyUp(keyCode, event)
     }
 
     @Suppress("OVERRIDE_DEPRECATION")
@@ -150,13 +149,42 @@ class AlertActivity : Activity() {
     private fun applyTarget(intent: Intent) {
         targetPackage = intent.getStringExtra(EXTRA_PACKAGE)
         preview = intent.getBooleanExtra(EXTRA_PREVIEW, false)
+        val disguiseOverride = intent.getIntExtra(EXTRA_DISGUISE, -1)
         label = resolveLabel(targetPackage)
         resetGestures()
         readyAt = SystemClock.elapsedRealtime() + SETTLE_MS
-        tvTitle.text = Prefs.alertTitle(this) ?: getString(R.string.alert_title)
-        tvMessage.text = Prefs.alertMessage(this)?.replace("{app}", label)
-            ?: getString(R.string.alert_message, label)
+        applyDisguise(
+            if (disguiseOverride >= 0) disguiseOverride else Prefs.disguise(this, targetPackage)
+        )
+    }
+
+    /** 0 = "not supported" (the vault's custom text applies), 1 = keeps stopping, 2 = not available, 3 = can't open. */
+    private fun applyDisguise(kind: Int) {
+        tvMessage.visibility = View.VISIBLE
+        btnNeutral.visibility = View.GONE
         btnPositive.setText(R.string.alert_ok)
+        when (kind) {
+            1 -> {
+                tvTitle.text = getString(R.string.dg_stop_title, label)
+                tvMessage.visibility = View.GONE
+                btnNeutral.setText(R.string.dg_app_info)
+                btnNeutral.visibility = View.VISIBLE
+                btnPositive.setText(R.string.dg_close_app)
+            }
+            2 -> {
+                tvTitle.setText(R.string.dg_na_title)
+                tvMessage.text = getString(R.string.dg_na_msg, label)
+            }
+            3 -> {
+                tvTitle.text = getString(R.string.dg_cant_title, label)
+                tvMessage.setText(R.string.dg_cant_msg)
+            }
+            else -> {
+                tvTitle.text = Prefs.alertTitle(this) ?: getString(R.string.alert_title)
+                tvMessage.text = Prefs.alertMessage(this)?.replace("{app}", label)
+                    ?: getString(R.string.alert_message, label)
+            }
+        }
     }
 
     private fun resetGestures() {
@@ -220,7 +248,7 @@ class AlertActivity : Activity() {
                 !right && bottom -> '3'
                 else -> '4'
             }
-            if (feed(cornerMatcher, Prefs.cornerCode(this), symbol)) unlockNow()
+            if (feed(cornerMatcher, Prefs.cornerCode(this), symbol)) unlockNow(Prefs.METHOD_CORNER)
         }
     }
 
@@ -246,8 +274,9 @@ class AlertActivity : Activity() {
         return false
     }
 
-    private fun unlockNow() {
+    private fun unlockNow(method: String) {
         closedByUser = true
+        if (!preview) targetPackage?.let { UnlockLog.add(this, it, method) }
         vibrateUnlock() // every unlock method ends here, so each one gets the same buzz
         if (preview) {
             returnToVault()
@@ -326,6 +355,7 @@ class AlertActivity : Activity() {
     companion object {
         private const val EXTRA_PACKAGE = "extra_package"
         private const val EXTRA_PREVIEW = "extra_preview"
+        private const val EXTRA_DISGUISE = "extra_disguise"
         private const val TAP_MAX_MS = 350L
         private const val TAP_WINDOW_MS = 2000L
         private const val ARM_WINDOW_MS = 3000L
@@ -338,10 +368,16 @@ class AlertActivity : Activity() {
         var isShowing = false
             private set
 
-        fun createIntent(context: Context, targetPackage: String, preview: Boolean = false): Intent =
+        fun createIntent(
+            context: Context,
+            targetPackage: String,
+            preview: Boolean = false,
+            disguise: Int = -1
+        ): Intent =
             Intent(context, AlertActivity::class.java)
                 .putExtra(EXTRA_PACKAGE, targetPackage)
                 .putExtra(EXTRA_PREVIEW, preview)
+                .putExtra(EXTRA_DISGUISE, disguise)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
     }
 }

@@ -42,6 +42,11 @@ object MediaVault {
     )
 
     private const val DIR = "media"
+    private const val DIR_DECOY = "media_decoy"
+
+    /** True while the decoy vault is open: everything below then reads and writes a separate, empty store. */
+    @Volatile
+    var decoy = false
     private const val INDEX = "index.json"
 
     private val lock = Any()
@@ -53,7 +58,7 @@ object MediaVault {
     }
 
     private fun dir(context: Context): File =
-        File(context.applicationContext.filesDir, DIR).also { it.mkdirs() }
+        File(context.applicationContext.filesDir, if (decoy) DIR_DECOY else DIR).also { it.mkdirs() }
 
     // ---- Index --------------------------------------------------------------
 
