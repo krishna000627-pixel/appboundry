@@ -56,6 +56,14 @@ object Prefs {
         prefs(context).edit().putBoolean(KEY_BLOCK_SHOTS, on).apply()
     }
 
+    // ---- Internet block for locked apps (on-device VPN) -------------------------
+
+    fun netBlock(context: Context): Boolean = prefs(context).getBoolean("net_block", false)
+
+    fun setNetBlock(context: Context, on: Boolean) {
+        prefs(context).edit().putBoolean("net_block", on).apply()
+    }
+
     // ---- Monitoring ---------------------------------------------------------
 
     fun isEnabled(context: Context): Boolean =

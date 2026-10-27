@@ -33,6 +33,7 @@ class BoundaryAccessibilityService : AccessibilityService() {
         instance = this
         unlockedPackage = null
         registerPackageReceiver()
+        BlockVpnService.sync(this)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -40,6 +41,7 @@ class BoundaryAccessibilityService : AccessibilityService() {
 
         val pkg = event.packageName?.toString() ?: return
         if (pkg == packageName) return // our own alert window
+        if (isTesting(pkg)) return // internet test: open the app without the cover, its internet stays cut
 
         // Check the blocked list first: asking the system about keyboards is slow and a blocked
         // app never needs it, so the cover can go up sooner.
@@ -49,6 +51,7 @@ class BoundaryAccessibilityService : AccessibilityService() {
         if (!Prefs.isEnabled(this)) {
             unlockedPackage = null
             hideCover()
+            BlockVpnService.sync(this)
             return
         }
 
@@ -57,6 +60,7 @@ class BoundaryAccessibilityService : AccessibilityService() {
         if (unlocked != null) {
             if (pkg == unlocked || isTransientWindow(pkg)) return
             unlockedPackage = null
+            BlockVpnService.sync(this) // left the app: its internet is cut again
         }
 
         if (!isTarget) return
@@ -218,6 +222,7 @@ class BoundaryAccessibilityService : AccessibilityService() {
         unregisterPackageReceiver()
         instance = null
         unlockedPackage = null
+        BlockVpnService.stop(this)
         super.onDestroy()
     }
 
@@ -241,8 +246,26 @@ class BoundaryAccessibilityService : AccessibilityService() {
         @Volatile
         private var cooldownUntil = 0L
 
+        private const val TEST_MS = 2 * 60 * 1000L
+
+        @Volatile
+        private var testPackage: String? = null
+
+        @Volatile
+        private var testUntil = 0L
+
+        /** For two minutes this app opens without the cover, but is NOT unlocked: its internet stays cut. */
+        fun startTest(pkg: String) {
+            testPackage = pkg
+            testUntil = SystemClock.elapsedRealtime() + TEST_MS
+        }
+
+        private fun isTesting(pkg: String): Boolean =
+            pkg == testPackage && SystemClock.elapsedRealtime() < testUntil
+
         fun grantSession(pkg: String?) {
             unlockedPackage = pkg
+            instance?.let { BlockVpnService.sync(it) } // unlocked: its internet comes back
         }
 
         /** Called when the alert is dismissed with OK/Back: ignore stray events for a moment. */

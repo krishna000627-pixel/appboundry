@@ -21,6 +21,16 @@
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name">
 
+        <!-- Local VPN that drops the traffic of locked apps only. Nothing leaves the phone. -->
+        <service
+            android:name=".BlockVpnService"
+            android:exported="false"
+            android:permission="android.permission.BIND_VPN_SERVICE">
+            <intent-filter>
+                <action android:name="android.net.VpnService" />
+            </intent-filter>
+        </service>
+
         <!-- No LAUNCHER category anywhere: no app-drawer icon. -->
         <activity
             android:name=".AlertActivity"

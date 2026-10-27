@@ -90,6 +90,14 @@
     <string name="vault_decoy_removed">Decoy PIN removed</string>
     <string name="vault_media_empty_decoy">Nothing hidden yet.\nUse the menu at the top to add photos and videos.</string>
 
+    <string name="vault_net_title">Cut internet while locked</string>
+    <string name="vault_net_desc">Blocked apps get no internet until you unlock them, and lose it again when you leave them. Only blocked apps are affected, so everything else keeps full speed. Uses a local VPN that never sends data anywhere.</string>
+    <string name="vault_net_test">Test: open app with no internet</string>
+    <string name="vault_net_test_off">Turn on "Cut internet while locked" first</string>
+    <string name="vault_net_test_none">No blocked app to test</string>
+    <string name="vault_net_test_missing">That app could not be opened</string>
+    <string name="vault_net_denied">VPN permission was not given</string>
+
     <!-- Vault: PIN -->
     <string name="vault_pin_enter_title">Enter PIN</string>
     <string name="vault_pin_enter_sub">Your vault is locked</string>
