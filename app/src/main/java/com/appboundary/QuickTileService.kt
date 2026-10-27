@@ -19,7 +19,6 @@ class QuickTileService : TileService() {
     override fun onClick() {
         super.onClick()
         Prefs.setEnabled(this, !Prefs.isEnabled(this))
-        BlockVpnService.sync(this)
         refreshTile()
     }
 

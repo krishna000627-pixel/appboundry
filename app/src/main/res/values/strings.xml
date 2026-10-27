@@ -90,13 +90,6 @@
     <string name="vault_decoy_removed">Decoy PIN removed</string>
     <string name="vault_media_empty_decoy">Nothing hidden yet.\nUse the menu at the top to add photos and videos.</string>
 
-    <string name="vault_net_title">Cut internet while locked</string>
-    <string name="vault_net_desc">Blocked apps get no internet until you unlock them, and lose it again when you leave them. Only blocked apps are affected, so everything else keeps full speed. Uses a local VPN that never sends data anywhere.</string>
-    <string name="vault_net_test">Test: open app with no internet</string>
-    <string name="vault_net_test_off">Turn on "Cut internet while locked" first</string>
-    <string name="vault_net_test_none">No blocked app to test</string>
-    <string name="vault_net_test_missing">That app could not be opened</string>
-    <string name="vault_net_denied">VPN permission was not given</string>
 
     <!-- Vault: PIN -->
     <string name="vault_pin_enter_title">Enter PIN</string>
@@ -188,7 +181,6 @@
     <string name="vault_add_gallery">Photos &amp; videos (gallery)</string>
     <string name="vault_add_files">Browse files</string>
     <string name="vault_media_empty">Nothing hidden yet.\nAdd photos and videos from the Security page.</string>
-    <string name="vault_media_count">%1$d hidden</string>
     <string name="vault_media_tile">Hidden photos &amp; videos</string>
     <string name="vault_media_play">&#9654;</string>
     <string name="vault_media_restore">Restore to gallery</string>
@@ -207,13 +199,9 @@
     <string name="vault_media_check">&#10003;</string>
     <string name="vault_prev">&#8249;</string>
     <string name="vault_next">&#8250;</string>
-    <string name="vault_tab_all">All %1$d</string>
-    <string name="vault_tab_photos">Photos %1$d</string>
-    <string name="vault_tab_videos">Videos %1$d</string>
     <string name="vault_sort_newest">Newest first</string>
     <string name="vault_sort_oldest">Oldest first</string>
     <string name="vault_media_summary">%1$d hidden &#183; %2$s</string>
-    <string name="vault_media_hint">Long-press a thumbnail to select several.</string>
     <string name="vault_files_title">All files access</string>
     <string name="vault_files_desc">Lets the vault remove the originals from your gallery in one step, with no extra confirmation. Nothing else is read.</string>
     <string name="vault_files_grant">Allow all files access</string>
@@ -225,7 +213,6 @@
     <string name="vault_status_storage">Hidden media size</string>
     <string name="vault_status_on">On</string>
     <string name="vault_status_off">Off &#8211; tap to fix</string>
-    <string name="vault_quick_hide">Hide photos</string>
     <string name="vault_quick_apps">Add apps</string>
     <string name="vault_blocked_summary">%1$d blocked &#183; Blocking is %2$s</string>
     <string name="vault_word_on">on</string>
@@ -244,7 +231,6 @@
     <string name="vault_wipe">Delete all hidden media</string>
     <string name="vault_wipe_title">Delete everything?</string>
     <string name="vault_wipe_msg">All %1$d hidden photos and videos will be erased permanently. This cannot be undone.</string>
-    <string name="vault_sel_count">%1$d selected</string>
     <string name="vault_sel_all">All</string>
     <string name="vault_sel_restore">Restore</string>
     <string name="vault_media_restored_n">Restored %1$d</string>
@@ -254,10 +240,6 @@
     <string name="vault_viewer_info">%1$s &#183; %2$s &#183; %3$s &#183; %4$d / %5$d</string>
     <string name="vault_media_empty_short">Nothing hidden yet</string>
 
-    <string name="vault_bnav_home">Home</string>
-    <string name="vault_bnav_photos">Photos</string>
-    <string name="vault_bnav_apps">Apps</string>
-    <string name="vault_bnav_more">More</string>
     <string name="vault_media_pause">&#10074;&#10074;</string>
     <string name="vault_home_media_hint">Tap to view and manage</string>
     <string name="vault_folder_screenshots">Screenshots</string>

@@ -7,7 +7,6 @@ import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.net.Uri
-import android.net.VpnService
 import android.provider.DocumentsContract
 import android.provider.MediaStore
 import android.view.WindowManager
@@ -222,7 +221,6 @@ class VaultActivity : Activity() {
     private var currentPage = Page.HOME
     private var changingPin = false
     private var settingDecoy = false
-    private lateinit var swNetBlock: Switch
     private var decoy = false
 
     // Unlock log and decoy PIN
@@ -462,7 +460,6 @@ class VaultActivity : Activity() {
         btnCornerSet = findViewById(R.id.btnCornerSet)
         llCornerPad = findViewById(R.id.llCornerPad)
 
-        swNetBlock = findViewById(R.id.swNetBlock)
         tvLogSummary = findViewById(R.id.tvLogSummary)
         llLog = findViewById(R.id.llLog)
         tvLogEmpty = findViewById(R.id.tvLogEmpty)
@@ -785,51 +782,6 @@ class VaultActivity : Activity() {
                     refreshAll()
                 }
                 .show()
-        }
-
-        // Internet cut for locked apps
-        swNetBlock.setOnCheckedChangeListener { _, checked ->
-            if (rendering) return@setOnCheckedChangeListener
-            if (!checked) {
-                Prefs.setNetBlock(this, false)
-                BlockVpnService.sync(this)
-                return@setOnCheckedChangeListener
-            }
-            val ask = VpnService.prepare(this)
-            if (ask == null) {
-                Prefs.setNetBlock(this, true)
-                BlockVpnService.sync(this)
-            } else {
-                // System consent screen: keep the vault unlocked while it is open.
-                rendering = true
-                swNetBlock.isChecked = false
-                rendering = false
-                holdLockUntil = System.currentTimeMillis() + HOLD_LOCK_MS
-                startActivityForResult(ask, REQ_VPN)
-            }
-        }
-
-        // Test: open a blocked app straight away, with its internet cut
-        findViewById<View>(R.id.btnNetTest).setOnClickListener {
-            if (!Prefs.netBlock(this)) {
-                Toast.makeText(this, R.string.vault_net_test_off, Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            val targets = Prefs.targets(this)
-            val pkg = (if ("com.instagram.android" in targets) "com.instagram.android" else targets.firstOrNull())
-            if (pkg == null) {
-                Toast.makeText(this, R.string.vault_net_test_none, Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            val launch = packageManager.getLaunchIntentForPackage(pkg)
-            if (launch == null) {
-                Toast.makeText(this, R.string.vault_net_test_missing, Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            BoundaryAccessibilityService.startTest(pkg)
-            BlockVpnService.sync(this) // make sure the tunnel is up before the app starts
-            holdLockUntil = System.currentTimeMillis() + HOLD_LOCK_MS
-            startActivity(launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }
 
         // Alert preview
@@ -1319,14 +1271,6 @@ class VaultActivity : Activity() {
             }
             if (uris.isNotEmpty() && !(expired && vaultRoot.visibility == View.VISIBLE)) {
                 chooseFolder(R.string.vault_folder_add_to) { target -> hideUris(uris, target) }
-            }
-        } else if (requestCode == REQ_VPN) {
-            if (resultCode == RESULT_OK) {
-                Prefs.setNetBlock(this, true)
-                BlockVpnService.sync(this)
-                refreshAll()
-            } else {
-                Toast.makeText(this, R.string.vault_net_denied, Toast.LENGTH_SHORT).show()
             }
         } else if (requestCode == REQ_DELETE) {
             Toast.makeText(this, R.string.vault_media_originals_done, Toast.LENGTH_SHORT).show()
@@ -2065,7 +2009,6 @@ class VaultActivity : Activity() {
         switchCamouflage.setOnCheckedChangeListener { _, checked ->
             if (!rendering) {
                 Prefs.setEnabled(this, checked)
-                BlockVpnService.sync(this)
                 renderCamouflageState(checked)
                 TileService.requestListeningState(this, ComponentName(this, QuickTileService::class.java))
             }
@@ -2155,7 +2098,6 @@ class VaultActivity : Activity() {
     private fun refreshAll() {
         rendering = true
         switchCamouflage.isChecked = Prefs.isEnabled(this)
-        swNetBlock.isChecked = Prefs.netBlock(this)
         swTapHold.isChecked = Prefs.unlockEnabled(this, Prefs.METHOD_TAP_HOLD)
         swVolume.isChecked = Prefs.unlockEnabled(this, Prefs.METHOD_VOLUME)
         swCorner.isChecked = Prefs.unlockEnabled(this, Prefs.METHOD_CORNER)
@@ -2382,7 +2324,6 @@ class VaultActivity : Activity() {
     // ---- Blocked apps -------------------------------------------------------
 
     private fun renderBlocked() {
-        BlockVpnService.sync(this) // the blocked list may have changed
         llBlocked.removeAllViews()
         val targets = Prefs.targets(this).sortedBy { AppCache.label(this, it).lowercase() }
         tvBlockedEmpty.visibility = if (targets.isEmpty()) View.VISIBLE else View.GONE
@@ -2593,7 +2534,6 @@ class VaultActivity : Activity() {
         private const val MAX_VOLUME = 6
         private const val REQ_PICK = 41
         private const val REQ_DELETE = 42
-        private const val REQ_VPN = 43
         private const val HOLD_LOCK_MS = 3 * 60 * 1000L
         private const val MIN_CORNER = 4
         private const val MAX_CORNER = 6
