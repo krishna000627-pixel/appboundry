@@ -16,6 +16,16 @@
         android:orientation="vertical"
         android:padding="24dp">
 
+        <ImageView
+            android:id="@+id/ivArt"
+            android:layout_width="match_parent"
+            android:layout_height="120dp"
+            android:layout_marginBottom="16dp"
+            android:contentDescription="@null"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_dev_art"
+            android:visibility="gone" />
+
         <TextView
             android:id="@+id/tvTitle"
             android:layout_width="match_parent"

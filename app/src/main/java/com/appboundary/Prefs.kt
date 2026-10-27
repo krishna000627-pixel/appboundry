@@ -213,7 +213,7 @@ object Prefs {
 
     // ---- Blocker disguise, chosen per blocked app (0 = "not supported", the original) ----
 
-    const val DISGUISE_COUNT = 4
+    const val DISGUISE_COUNT = 5
 
     fun disguise(context: Context, pkg: String?): Int {
         if (pkg == null) return 0

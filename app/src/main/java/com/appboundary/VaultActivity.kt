@@ -295,7 +295,7 @@ class VaultActivity : Activity() {
                 return
             }
         }
-        if (vaultRoot.visibility == View.VISIBLE) refreshAll()
+        if (vaultRoot.visibility == View.VISIBLE && !decoy) refreshAll()
     }
 
     /** Leaving the screen always locks the vault again. */
@@ -1927,12 +1927,16 @@ class VaultActivity : Activity() {
         vaultRoot.visibility = View.VISIBLE
         vaultRoot.alpha = 0f
         vaultRoot.animate().alpha(1f).setDuration(220).start()
-        findViewById<View>(R.id.btnMenu).visibility = if (asDecoy) View.GONE else View.VISIBLE
+        val decoyPage = findViewById<View>(R.id.pageDecoy)
         if (asDecoy) {
-            // Only an ordinary photo vault: no settings, blocked apps or status.
-            showPage(Page.PHOTOS)
+            // A plain screen of "under development" boxes: no settings and nothing about this app.
+            for (v in pageViews.values) v.visibility = View.GONE
+            decoyPage.visibility = View.VISIBLE
+            decoyPage.scrollTo(0, 0)
+            findViewById<View>(R.id.vaultTopBar).visibility = View.GONE
             return
         }
+        decoyPage.visibility = View.GONE
         loadAlertTexts()
         loadTileName()
         showPage(Page.HOME)
@@ -2352,6 +2356,7 @@ class VaultActivity : Activity() {
             1 -> R.string.vault_dg_1
             2 -> R.string.vault_dg_2
             3 -> R.string.vault_dg_3
+            4 -> R.string.vault_dg_4
             else -> R.string.vault_dg_0
         }
     )

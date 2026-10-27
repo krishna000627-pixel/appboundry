@@ -140,6 +140,7 @@
                 <include layout="@layout/page_alert" />
                 <include layout="@layout/page_unlock" />
                 <include layout="@layout/page_log" />
+                <include layout="@layout/page_decoy" />
                 <include layout="@layout/page_tile" />
                 <include layout="@layout/page_security" />
             </FrameLayout>

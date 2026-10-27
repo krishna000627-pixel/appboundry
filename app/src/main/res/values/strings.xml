@@ -16,8 +16,10 @@
     <string name="dg_na_msg">%1$s isn\'t available in your country or region.</string>
     <string name="dg_cant_title">Can\'t open %1$s</string>
     <string name="dg_cant_msg">Something went wrong. Please try again later.</string>
+    <string name="dg_dev_title">Under development</string>
+    <string name="dg_dev_msg">%1$s is being rebuilt and isn\'t available yet. Please check back later.</string>
     <string name="fallback_app_name">This app</string>
-    <string name="service_description">Detects when a restricted app is opened and shows a camouflage alert. Enable it in Accessibility settings, then toggle it from Quick Settings.</string>
+    <string name="service_description">Detects when a restricted app is opened and shows a notice instead. Enable it in Accessibility settings, then toggle it from Quick Settings.</string>
 
     <!-- Vault: general -->
     <string name="vault_label">Vault</string>
@@ -70,9 +72,10 @@
     <string name="vault_dg_1">App keeps stopping</string>
     <string name="vault_dg_2">Not available in region</string>
     <string name="vault_dg_3">Can\'t open</string>
+    <string name="vault_dg_4">Under development (with picture)</string>
     <string name="vault_alert_hint_dg">The text above is used by the "Not supported" disguise only.</string>
     <string name="vault_decoy_title">Decoy PIN</string>
-    <string name="vault_decoy_desc">A second PIN that opens a separate, empty vault with only photos and videos. Your real vault and settings stay hidden. Use it if someone makes you open the vault.</string>
+    <string name="vault_decoy_desc">A second PIN that opens a fake screen of boxes saying the app is under development. No settings and nothing about this app are shown, and your real vault stays hidden. Use it if someone makes you open the vault.</string>
     <string name="vault_decoy_set">Set decoy PIN</string>
     <string name="vault_decoy_change">Change decoy PIN</string>
     <string name="vault_decoy_remove">Remove</string>
@@ -216,12 +219,12 @@
     <string name="vault_status_off">Off &#8211; tap to fix</string>
     <string name="vault_quick_hide">Hide photos</string>
     <string name="vault_quick_apps">Add apps</string>
-    <string name="vault_blocked_summary">%1$d blocked &#183; Camouflage is %2$s</string>
+    <string name="vault_blocked_summary">%1$d blocked &#183; Blocking is %2$s</string>
     <string name="vault_word_on">on</string>
     <string name="vault_word_off">off</string>
     <string name="vault_remove_all">Remove all</string>
     <string name="vault_remove_all_title">Remove all blocked apps?</string>
-    <string name="vault_remove_all_msg">Camouflage will have nothing to cover until you add apps again.</string>
+    <string name="vault_remove_all_msg">Nothing will be blocked until you add apps again.</string>
     <string name="vault_alert_preview_label">Live preview</string>
     <string name="vault_alert_counts">Title %1$d characters &#183; Message %2$d characters</string>
     <string name="vault_unlock_summary">%1$d of %2$d unlock methods active</string>

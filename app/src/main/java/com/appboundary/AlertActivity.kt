@@ -19,6 +19,7 @@ import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.widget.Button
+import android.widget.ImageView
 import android.widget.TextView
 
 class AlertActivity : Activity() {
@@ -33,6 +34,7 @@ class AlertActivity : Activity() {
     private lateinit var tvMessage: TextView
     private lateinit var btnPositive: Button
     private lateinit var btnNeutral: Button
+    private lateinit var ivArt: ImageView
 
     private var targetPackage: String? = null
     private var label: String = ""
@@ -71,6 +73,7 @@ class AlertActivity : Activity() {
         tvMessage = findViewById(R.id.tvMessage)
         btnPositive = findViewById(R.id.btnPositive)
         btnNeutral = findViewById(R.id.btnNeutral)
+        ivArt = findViewById(R.id.ivArt)
         btnPositive.setOnClickListener { goHomeAndFinish() }
         btnNeutral.setOnClickListener { goHomeAndFinish() }
 
@@ -158,9 +161,10 @@ class AlertActivity : Activity() {
         )
     }
 
-    /** 0 = "not supported" (the vault's custom text applies), 1 = keeps stopping, 2 = not available, 3 = can't open. */
+    /** 0 = "not supported" (the vault's custom text applies), 1 = keeps stopping, 2 = not available, 3 = can't open, 4 = under development. */
     private fun applyDisguise(kind: Int) {
         tvMessage.visibility = View.VISIBLE
+        ivArt.visibility = View.GONE
         btnNeutral.visibility = View.GONE
         btnPositive.setText(R.string.alert_ok)
         when (kind) {
@@ -178,6 +182,11 @@ class AlertActivity : Activity() {
             3 -> {
                 tvTitle.text = getString(R.string.dg_cant_title, label)
                 tvMessage.setText(R.string.dg_cant_msg)
+            }
+            4 -> {
+                ivArt.visibility = View.VISIBLE
+                tvTitle.setText(R.string.dg_dev_title)
+                tvMessage.text = getString(R.string.dg_dev_msg, label)
             }
             else -> {
                 tvTitle.text = Prefs.alertTitle(this) ?: getString(R.string.alert_title)
