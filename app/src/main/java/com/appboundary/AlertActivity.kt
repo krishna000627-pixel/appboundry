@@ -112,20 +112,32 @@ class AlertActivity : Activity() {
         }
     }
 
-    // Way 2: volume code. Volume still works normally while the code is typed.
+    // Way 2: volume code. While this method is on, the volume keys are swallowed here, so the
+    // system volume bar never appears and the volume never changes on the blocker screen.
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        if (event.repeatCount == 0 && isReady() && Prefs.unlockEnabled(this, Prefs.METHOD_VOLUME)) {
-            val symbol = when (keyCode) {
-                KeyEvent.KEYCODE_VOLUME_UP -> 'U'
-                KeyEvent.KEYCODE_VOLUME_DOWN -> 'D'
-                else -> null
-            }
-            if (symbol != null && feed(volumeMatcher, Prefs.volumeCode(this), symbol)) {
+        val symbol = when (keyCode) {
+            KeyEvent.KEYCODE_VOLUME_UP -> 'U'
+            KeyEvent.KEYCODE_VOLUME_DOWN -> 'D'
+            else -> null
+        }
+        if (symbol != null && Prefs.unlockEnabled(this, Prefs.METHOD_VOLUME)) {
+            if (event.repeatCount == 0 && isReady() &&
+                feed(volumeMatcher, Prefs.volumeCode(this), symbol)
+            ) {
                 unlockNow(Prefs.METHOD_VOLUME)
-                return true
             }
+            return true
         }
         return super.onKeyDown(keyCode, event)
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        if ((keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) &&
+            Prefs.unlockEnabled(this, Prefs.METHOD_VOLUME)
+        ) {
+            return true
+        }
+        return super.onKeyUp(keyCode, event)
     }
 
     @Suppress("OVERRIDE_DEPRECATION")
