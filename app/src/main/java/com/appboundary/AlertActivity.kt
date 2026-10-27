@@ -61,7 +61,15 @@ class AlertActivity : Activity() {
 
     // Way 4: two fingers held on the black area.
     private val handler = Handler(Looper.getMainLooper())
-    private val twoFingerUnlock = Runnable { if (isReady() && gestureOk && multiTouch) unlockNow(Prefs.METHOD_TWO_FINGER) }
+    private val twoFingerUnlock = Runnable {
+        if (isReady() && !isThrottled() && gestureOk && multiTouch) unlockNow(Prefs.METHOD_TWO_FINGER)
+    }
+    private val fingerX = FloatArray(2)
+    private val fingerY = FloatArray(2)
+    private var fingersTracked = false
+
+    // Guessing guard: lots of wrong input in a short time switches every secret method off for a while.
+    private val misses = ArrayDeque<Long>()
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -79,10 +87,11 @@ class AlertActivity : Activity() {
 
         // Way 1, part 2: press and hold the box (not the OK button).
         findViewById<View>(R.id.card).setOnLongClickListener {
-            if (isReady() && Prefs.unlockEnabled(this, Prefs.METHOD_TAP_HOLD) && isArmed()) {
+            if (isReady() && !isThrottled() && Prefs.unlockEnabled(this, Prefs.METHOD_TAP_HOLD) && isArmed()) {
                 unlockNow(Prefs.METHOD_TAP_HOLD)
                 true
             } else {
+                if (taps > 0) noteMiss()
                 taps = 0
                 false
             }
@@ -213,6 +222,7 @@ class AlertActivity : Activity() {
         taps = 0
         multiTouch = false
         gestureOk = false
+        fingersTracked = false
         volumeMatcher.progress = 0
         cornerMatcher.progress = 0
     }
@@ -231,13 +241,33 @@ class AlertActivity : Activity() {
             }
             MotionEvent.ACTION_POINTER_DOWN -> {
                 multiTouch = true
-                if (gestureOk && event.pointerCount == 2 &&
+                if (gestureOk && event.pointerCount == 2 && !isThrottled() &&
                     Prefs.unlockEnabled(this, Prefs.METHOD_TWO_FINGER)
                 ) {
+                    for (i in 0..1) {
+                        fingerX[i] = event.getX(i)
+                        fingerY[i] = event.getY(i)
+                    }
+                    fingersTracked = true
                     handler.postDelayed(twoFingerUnlock, TWO_FINGER_HOLD_MS)
                 }
             }
-            MotionEvent.ACTION_POINTER_UP -> handler.removeCallbacks(twoFingerUnlock)
+            // Two fingers must stay put: swiping or dragging cancels the hold.
+            MotionEvent.ACTION_MOVE -> if (fingersTracked && event.pointerCount >= 2) {
+                val slop = v.resources.displayMetrics.density * FINGER_SLOP_DP
+                for (i in 0..1) {
+                    val dx = event.getX(i) - fingerX[i]
+                    val dy = event.getY(i) - fingerY[i]
+                    if (dx * dx + dy * dy > slop * slop) {
+                        handler.removeCallbacks(twoFingerUnlock)
+                        fingersTracked = false
+                    }
+                }
+            }
+            MotionEvent.ACTION_POINTER_UP -> {
+                handler.removeCallbacks(twoFingerUnlock)
+                fingersTracked = false
+            }
             MotionEvent.ACTION_CANCEL -> {
                 handler.removeCallbacks(twoFingerUnlock)
                 multiTouch = false
@@ -279,20 +309,40 @@ class AlertActivity : Activity() {
 
     /** Advances a code; returns true when the whole code has been entered. */
     private fun feed(matcher: Matcher, code: String, symbol: Char): Boolean {
-        if (code.isEmpty()) return false
+        if (code.isEmpty() || isThrottled()) return false
         val now = SystemClock.elapsedRealtime()
         if (now - matcher.lastAt > TAP_WINDOW_MS) matcher.progress = 0
         matcher.lastAt = now
         matcher.progress = when {
             code[matcher.progress] == symbol -> matcher.progress + 1
-            code[0] == symbol -> 1
-            else -> 0
+            code[0] == symbol -> {
+                noteMiss()
+                1
+            }
+            else -> {
+                noteMiss()
+                0
+            }
         }
         if (matcher.progress == code.length) {
             matcher.progress = 0
             return true
         }
         return false
+    }
+
+    private fun isThrottled(): Boolean = SystemClock.elapsedRealtime() < throttleUntil
+
+    /** Counts a wrong input; too many in a short time pauses all secret unlock methods for a while. */
+    private fun noteMiss() {
+        val now = SystemClock.elapsedRealtime()
+        misses.addLast(now)
+        while (misses.isNotEmpty() && now - misses.first() > MISS_WINDOW_MS) misses.removeFirst()
+        if (misses.size >= MAX_MISSES) {
+            throttleUntil = now + THROTTLE_MS
+            misses.clear()
+            resetGestures()
+        }
     }
 
     private fun unlockNow(method: String) {
@@ -383,6 +433,14 @@ class AlertActivity : Activity() {
         private const val TWO_FINGER_HOLD_MS = 1500L
         private const val SETTLE_MS = 500L
         private const val UNLOCK_VIBRATION_MS = 60L
+        private const val MISS_WINDOW_MS = 10_000L
+        private const val MAX_MISSES = 10
+        private const val THROTTLE_MS = 30_000L
+        private const val FINGER_SLOP_DP = 40f
+
+        /** Kept for the whole process, so closing and reopening the blocker does not reset the guard. */
+        @Volatile
+        private var throttleUntil = 0L
 
         /** True while an alert exists, so the service never launches a second one. */
         @Volatile

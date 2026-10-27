@@ -41,7 +41,10 @@ class BoundaryAccessibilityService : AccessibilityService() {
         val pkg = event.packageName?.toString() ?: return
         if (pkg == packageName) return // our own alert window
 
-        if (!isTransientWindow(pkg)) lastPkg = pkg
+        // Check the blocked list first: asking the system about keyboards is slow and a blocked
+        // app never needs it, so the cover can go up sooner.
+        val isTarget = pkg in Prefs.targets(this)
+        if (isTarget || !isTransientWindow(pkg)) lastPkg = pkg
 
         if (!Prefs.isEnabled(this)) {
             unlockedPackage = null
@@ -56,7 +59,7 @@ class BoundaryAccessibilityService : AccessibilityService() {
             unlockedPackage = null
         }
 
-        if (pkg !in Prefs.targets(this)) return
+        if (!isTarget) return
 
         // Never stack a second alert: skip if one is on screen or was just dismissed.
         val now = SystemClock.elapsedRealtime()

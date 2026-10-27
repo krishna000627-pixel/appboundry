@@ -2335,7 +2335,7 @@ class VaultActivity : Activity() {
         for (pkg in targets) {
             val row = layoutInflater.inflate(R.layout.row_app, llBlocked, false)
             row.findViewById<TextView>(R.id.tvLabel).text = AppCache.label(this, pkg)
-            row.findViewById<TextView>(R.id.tvPkg).text = pkg
+            row.findViewById<View>(R.id.tvPkg).visibility = View.GONE
             bindIcon(row.findViewById(R.id.ivIcon), pkg)
             row.findViewById<TextView>(R.id.tvDisguise).text = getString(
                 R.string.vault_disguise_row, disguiseName(Prefs.disguise(this, pkg))
