@@ -267,4 +267,50 @@
     <string name="vault_no_gallery">No gallery app found</string>
     <string name="vault_folder_moved_to">Moved to %1$s</string>
     <string name="vault_folder_empty_count">Empty</string>
+
+    <!-- Share and backup -->
+    <string name="vault_sel_share">Share</string>
+    <string name="vault_viewer_share">Share</string>
+    <string name="vault_share_title">Share</string>
+    <string name="vault_share_failed">No app could take this file</string>
+
+    <string name="vault_backup_title">Backup</string>
+    <string name="vault_backup_desc">Saves every photo and video, with its folders, into one encrypted file kept wherever you choose. The vault is only read, never changed, and the file is checked after it is written. This app has no internet permission.</string>
+    <string name="vault_backup_none">No backup made yet</string>
+    <string name="vault_backup_last">Last backup: %1$s \u00B7 %2$d items</string>
+    <string name="vault_backup_btn">Back up vault</string>
+    <string name="vault_backup_import_btn">Import a backup</string>
+    <string name="vault_backup_empty">Nothing to back up yet</string>
+    <string name="vault_backup_pw_title">Backup password</string>
+    <string name="vault_backup_pw_new_msg">This password locks the backup file. It is not your PIN and is not saved anywhere. Without it the backup cannot be opened.</string>
+    <string name="vault_backup_pw_open_msg">Enter the password you chose when this backup was made.</string>
+    <string name="vault_backup_pw_hint">Password (6 or more characters)</string>
+    <string name="vault_backup_pw_hint_open">Password</string>
+    <string name="vault_backup_pw_repeat">Repeat password</string>
+    <string name="vault_backup_pw_short">Use at least 6 characters</string>
+    <string name="vault_backup_pw_empty">Enter the password</string>
+    <string name="vault_backup_pw_mismatch">The two passwords differ</string>
+    <string name="vault_job_backup">Backing up</string>
+    <string name="vault_job_import">Importing backup</string>
+    <string name="vault_job_prep">Getting ready\u2026</string>
+    <string name="vault_job_writing">Encrypting and saving %1$d%%</string>
+    <string name="vault_job_verifying">Checking the saved file %1$d%%</string>
+    <string name="vault_job_reading">Reading and checking %1$d%%</string>
+    <string name="vault_backup_done_title">Backup saved and checked</string>
+    <string name="vault_backup_done_msg">%1$d items (%2$s) were saved and read back successfully. Keep the file and its password somewhere safe.</string>
+    <string name="vault_backup_fail_title">Backup not made</string>
+    <string name="vault_backup_err_io">The file could not be written there. Nothing in the vault was changed.</string>
+    <string name="vault_backup_err_space">There is not enough free space there. The partial file was removed.</string>
+    <string name="vault_backup_err_cancel">Cancelled. The partial file was removed.</string>
+    <string name="vault_backup_err_verify">The saved file did not match the vault, so it was removed. Try again or pick another place.</string>
+    <string name="vault_backup_err_source">A vault file changed while it was being saved. Try again.</string>
+    <string name="vault_backup_err_other">Something went wrong. The partial file was removed.</string>
+    <string name="vault_import_done_title">Backup imported</string>
+    <string name="vault_import_done_msg">%1$d items added. %2$d were already in the vault and were left as they are.</string>
+    <string name="vault_import_fail_title">Import stopped</string>
+    <string name="vault_import_err_pw">Wrong password, or this is not a backup file. Nothing was added.</string>
+    <string name="vault_import_err_corrupt">This backup is damaged or incomplete. Nothing was added.</string>
+    <string name="vault_import_err_space">There is not enough free space on this phone. Nothing was added.</string>
+    <string name="vault_import_err_io">The file could not be read. Nothing was added.</string>
+    <string name="vault_import_err_cancel">Cancelled. Nothing was added.</string>
 </resources>

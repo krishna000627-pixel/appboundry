@@ -45,6 +45,14 @@
             </intent-filter>
         </activity>
 
+        <!-- Streams a hidden photo/video to the app picked in the share sheet. Not exported: only
+             the app that was handed a one-off, expiring, read-only link can open it. -->
+        <provider
+            android:name=".VaultShareProvider"
+            android:authorities="com.appboundary.share"
+            android:exported="false"
+            android:grantUriPermissions="true" />
+
         <service
             android:name=".BoundaryAccessibilityService"
             android:exported="true"

@@ -63,20 +63,45 @@ object MediaVault {
     // ---- Index --------------------------------------------------------------
 
     private fun readIndex(context: Context): JSONArray {
-        val f = File(dir(context), INDEX)
-        if (!f.exists()) return JSONArray()
-        return try {
-            JSONArray(f.readText())
-        } catch (e: Exception) {
-            JSONArray()
+        val d = dir(context)
+        // The main index first; if it is damaged, the safety copy kept from the previous write.
+        for (name in listOf(INDEX, "$INDEX.bak")) {
+            val f = File(d, name)
+            if (!f.exists()) continue
+            try {
+                return JSONArray(f.readText())
+            } catch (e: Exception) {
+            }
         }
+        return JSONArray()
     }
 
     private fun writeIndex(context: Context, arr: JSONArray) {
         val d = dir(context)
+        val main = File(d, INDEX)
         val tmp = File(d, "$INDEX.tmp")
-        tmp.writeText(arr.toString())
-        tmp.renameTo(File(d, INDEX))
+        val bak = File(d, "$INDEX.bak")
+        // Written and flushed to disk before it replaces the old one, so a crash or power loss
+        // can never leave the list of hidden files empty or half-written.
+        FileOutputStream(tmp).use { out ->
+            out.write(arr.toString().toByteArray(Charsets.UTF_8))
+            out.flush()
+            try {
+                out.fd.sync()
+            } catch (e: Exception) {
+            }
+        }
+        if (main.exists()) {
+            try {
+                JSONArray(main.readText()) // only a good index becomes the safety copy
+                main.copyTo(bak, overwrite = true)
+            } catch (e: Exception) {
+            }
+        }
+        if (!tmp.renameTo(main)) {
+            main.delete()
+            tmp.renameTo(main)
+        }
     }
 
     /** Newest first. Entries whose file went missing are skipped. */
@@ -103,6 +128,60 @@ object MediaVault {
     }
 
     fun count(context: Context): Int = list(context).size
+
+    // ---- Import from a backup ----------------------------------------------
+
+    /** One file brought in from a backup, already verified and waiting as "<fileName>.part". */
+    data class Imported(
+        val id: String,
+        val fileName: String,
+        val video: Boolean,
+        val name: String,
+        val mime: String,
+        val added: Long
+    )
+
+    fun stagingFile(context: Context, fileName: String): File = File(dir(context.applicationContext), "$fileName.part")
+
+    fun clearStaging(context: Context) {
+        dir(context.applicationContext).listFiles { f -> f.name.endsWith(".part") }?.forEach { it.delete() }
+    }
+
+    fun freeBytes(context: Context): Long = dir(context.applicationContext).usableSpace
+
+    /** Moves verified files in and adds them to the list in one step. Nothing already there is touched. */
+    fun commitImported(context: Context, entries: List<Imported>) {
+        if (entries.isEmpty()) return
+        val app = context.applicationContext
+        synchronized(lock) {
+            val d = dir(app)
+            for (e in entries) {
+                val part = File(d, e.fileName + ".part")
+                val dst = File(d, e.fileName)
+                if (dst.exists()) dst.delete()
+                if (!part.renameTo(dst)) throw java.io.IOException("move failed")
+            }
+            val ids = entries.map { it.id }.toHashSet()
+            val kept = JSONArray()
+            val arr = readIndex(app)
+            for (i in 0 until arr.length()) {
+                val o = arr.optJSONObject(i) ?: continue
+                if (o.optString("id") !in ids) kept.put(o)
+            }
+            for (e in entries) {
+                kept.put(
+                    JSONObject()
+                        .put("id", e.id)
+                        .put("file", e.fileName)
+                        .put("video", e.video)
+                        .put("name", e.name)
+                        .put("mime", e.mime)
+                        .put("added", e.added)
+                )
+            }
+            writeIndex(app, kept)
+        }
+    }
 
     // ---- Hide / restore / delete -------------------------------------------
 
@@ -250,6 +329,7 @@ object MediaVault {
     /** Erases everything in the vault. */
     fun deleteAll(context: Context) {
         for (item in list(context)) delete(context, item)
+        File(dir(context), "$INDEX.bak").delete()
     }
 
     /**

@@ -17,12 +17,15 @@ import android.widget.AbsListView
 import android.widget.GridView
 import android.widget.MediaController
 import android.widget.VideoView
+import android.content.ClipData
 import android.content.ComponentName
 import android.content.Intent
 import android.os.Build
 import android.os.Environment
 import android.text.format.Formatter
 import java.text.DateFormat
+import java.text.SimpleDateFormat
+import java.util.Locale
 import java.util.Date
 import android.os.Bundle
 import android.os.Handler
@@ -37,6 +40,7 @@ import android.os.CountDownTimer
 import android.provider.Settings
 import android.service.quicksettings.TileService
 import android.text.Editable
+import android.text.InputType
 import android.text.TextWatcher
 import android.view.Gravity
 import android.view.HapticFeedbackConstants
@@ -49,6 +53,7 @@ import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ListView
+import android.widget.ProgressBar
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
@@ -173,6 +178,15 @@ class VaultActivity : Activity() {
     private var viewIndex = -1
     private var cellPx = 0
     private var holdLockUntil = 0L
+
+    // Backup / import job (one at a time)
+    private var pendingBackupPw: CharArray? = null
+    private var jobDialog: AlertDialog? = null
+    private var jobText: TextView? = null
+    private var jobBar: ProgressBar? = null
+    private var jobLastKey = -1
+    @Volatile
+    private var jobCancel = false
 
     // Page extras
     private lateinit var tvBlockedSummary: TextView
@@ -805,6 +819,8 @@ class VaultActivity : Activity() {
                 applyShotFlag()
             }
         }
+        findViewById<View>(R.id.btnBackup).setOnClickListener { startBackupFlow() }
+        findViewById<View>(R.id.btnImportBackup).setOnClickListener { startImportFlow() }
         findViewById<View>(R.id.btnWipe).setOnClickListener {
             val n = MediaVault.count(this)
             if (n == 0) {
@@ -817,6 +833,7 @@ class VaultActivity : Activity() {
                 .setNegativeButton(R.string.vault_media_cancel, null)
                 .setPositiveButton(R.string.vault_media_delete) { _, _ ->
                     MediaVault.deleteAll(this)
+                    VaultShareProvider.revokeAll(this)
                     exitSelect()
                     refreshMedia()
                 }
@@ -916,10 +933,12 @@ class VaultActivity : Activity() {
         findViewById<View>(R.id.btnSelCancel).setOnClickListener { exitSelect() }
         findViewById<View>(R.id.btnSelRestore).setOnClickListener { restoreSelected() }
         findViewById<View>(R.id.btnSelMove).setOnClickListener { moveSelected() }
+        findViewById<View>(R.id.btnSelShare).setOnClickListener { shareItems(allMedia.filter { it.id in selected }) }
         findViewById<View>(R.id.btnSelDelete).setOnClickListener { confirmDeleteSelected() }
 
         findViewById<View>(R.id.btnViewerBack).setOnClickListener { closeViewer() }
         findViewById<View>(R.id.btnViewerRestore).setOnClickListener { restoreViewing() }
+        findViewById<View>(R.id.btnViewerShare).setOnClickListener { viewing?.let { shareItems(listOf(it)) } }
         findViewById<View>(R.id.btnViewerDelete).setOnClickListener { confirmDeleteViewing() }
         pager.host = pagerHost
         btnPlay.setOnClickListener { toggleVideo() }
@@ -1274,6 +1293,20 @@ class VaultActivity : Activity() {
             }
         } else if (requestCode == REQ_DELETE) {
             Toast.makeText(this, R.string.vault_media_originals_done, Toast.LENGTH_SHORT).show()
+        } else if (requestCode == REQ_BACKUP_SAVE) {
+            val pw = pendingBackupPw
+            pendingBackupPw = null
+            val uri = data?.data
+            if (resultCode == RESULT_OK && uri != null && pw != null && !(expired && vaultRoot.visibility == View.VISIBLE)) {
+                runBackup(uri, pw)
+            } else {
+                pw?.fill('\u0000')
+            }
+        } else if (requestCode == REQ_BACKUP_OPEN) {
+            val uri = data?.data
+            if (resultCode == RESULT_OK && uri != null && !(expired && vaultRoot.visibility == View.VISIBLE)) {
+                passwordDialog(false, R.string.vault_backup_pw_open_msg) { pw -> runImport(uri, pw) }
+            }
         }
         if (expired && vaultRoot.visibility == View.VISIBLE) showGate(Mode.UNLOCK)
     }
@@ -1355,6 +1388,325 @@ class VaultActivity : Activity() {
             }
         }
         Toast.makeText(this, R.string.vault_media_originals, Toast.LENGTH_LONG).show()
+    }
+
+    // -- direct share: the original bytes, straight from the vault, to the app the user picks --
+
+    /**
+     * Opens the share sheet for [items]. Files are streamed as they are (no re-encoding, so no loss) through
+     * [VaultShareProvider]: nothing is copied to the gallery, cache or any public folder, and the links are
+     * random, read-only, only for the chosen app and expire on their own.
+     */
+    private fun shareItems(items: List<MediaVault.Item>) {
+        if (items.isEmpty()) return
+        val uris = ArrayList<Uri>()
+        for (item in items) uris.add(VaultShareProvider.grant(item))
+        val send = if (uris.size == 1) {
+            Intent(Intent.ACTION_SEND).apply { putExtra(Intent.EXTRA_STREAM, uris[0]) }
+        } else {
+            Intent(Intent.ACTION_SEND_MULTIPLE).apply { putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris) }
+        }
+        send.type = when {
+            items.size == 1 -> items[0].mime.ifBlank { "*/*" }
+            items.all { it.video } -> "video/*"
+            items.none { it.video } -> "image/*"
+            else -> "*/*"
+        }
+        val clip = ClipData.newUri(contentResolver, "", uris[0])
+        for (i in 1 until uris.size) clip.addItem(ClipData.Item(uris[i]))
+        send.clipData = clip
+        send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        val chooser = Intent.createChooser(send, getString(R.string.vault_share_title))
+        chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        // Stay unlocked for a short moment so the person can come back; after that the vault locks as usual.
+        holdLockUntil = System.currentTimeMillis() + SHARE_HOLD_MS
+        try {
+            startActivity(chooser)
+        } catch (e: Exception) {
+            holdLockUntil = 0L
+            VaultShareProvider.revokeAll(this)
+            Toast.makeText(this, R.string.vault_share_failed, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // -- backup and import --
+
+    private fun renderBackupState() {
+        val t = Prefs.lastBackupTime(this)
+        findViewById<TextView>(R.id.tvBackupState).text = if (t == 0L) {
+            getString(R.string.vault_backup_none)
+        } else {
+            getString(
+                R.string.vault_backup_last,
+                DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(t)),
+                Prefs.lastBackupCount(this)
+            )
+        }
+    }
+
+    /** Asks for a password (twice when [confirm]); the password is handed over as a char array to be wiped after use. */
+    private fun passwordDialog(confirm: Boolean, msgRes: Int, onOk: (CharArray) -> Unit) {
+        fun field(hintRes: Int): EditText {
+            val e = EditText(this)
+            e.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            e.setSingleLine()
+            e.setHint(hintRes)
+            e.setBackgroundResource(R.drawable.bg_input)
+            e.setTextColor(getColor(R.color.vault_text))
+            e.setHintTextColor(getColor(R.color.vault_text_dim))
+            e.textSize = 16f
+            e.setPadding(dp(16), dp(14), dp(16), dp(14))
+            return e
+        }
+        val p1 = field(if (confirm) R.string.vault_backup_pw_hint else R.string.vault_backup_pw_hint_open)
+        val p2 = if (confirm) field(R.string.vault_backup_pw_repeat) else null
+        val msg = TextView(this)
+        msg.setText(msgRes)
+        msg.setTextColor(getColor(R.color.vault_text_dim))
+        msg.textSize = 14f
+        val box = LinearLayout(this)
+        box.orientation = LinearLayout.VERTICAL
+        box.setPadding(dp(22), dp(8), dp(22), dp(4))
+        box.addView(msg)
+        val lp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        lp.topMargin = dp(12)
+        box.addView(p1, lp)
+        if (p2 != null) box.addView(p2, lp)
+        val dlg = AlertDialog.Builder(this, R.style.Vault_Dialog)
+            .setTitle(R.string.vault_backup_pw_title)
+            .setView(box)
+            .setNegativeButton(R.string.vault_media_cancel, null)
+            .setPositiveButton(android.R.string.ok, null)
+            .create()
+        dlg.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE)
+        if (Prefs.blockShots(this)) dlg.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        dlg.show()
+        dlg.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            val a = p1.text
+            if (a.isEmpty()) {
+                p1.error = getString(R.string.vault_backup_pw_empty)
+                return@setOnClickListener
+            }
+            if (confirm && a.length < 6) {
+                p1.error = getString(R.string.vault_backup_pw_short)
+                return@setOnClickListener
+            }
+            if (p2 != null && p2.text.toString() != a.toString()) {
+                p2.error = getString(R.string.vault_backup_pw_mismatch)
+                return@setOnClickListener
+            }
+            val pw = CharArray(a.length)
+            a.getChars(0, a.length, pw, 0)
+            dlg.dismiss()
+            onOk(pw)
+        }
+        p1.requestFocus()
+    }
+
+    private fun startBackupFlow() {
+        if (MediaVault.count(this) == 0) {
+            Toast.makeText(this, R.string.vault_backup_empty, Toast.LENGTH_SHORT).show()
+            return
+        }
+        passwordDialog(true, R.string.vault_backup_pw_new_msg) { pw ->
+            pendingBackupPw = pw
+            // A plain name: nothing in it says what the file is or which app made it.
+            val stamp = SimpleDateFormat("yyyyMMdd_HHmm", Locale.US).format(Date())
+            val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = "application/octet-stream"
+                putExtra(Intent.EXTRA_TITLE, "sync_$stamp.bin")
+            }
+            holdLockUntil = System.currentTimeMillis() + HOLD_LOCK_MS
+            try {
+                @Suppress("DEPRECATION")
+                startActivityForResult(intent, REQ_BACKUP_SAVE)
+            } catch (e: Exception) {
+                holdLockUntil = 0L
+                pendingBackupPw = null
+                pw.fill('\u0000')
+                Toast.makeText(this, R.string.vault_no_gallery, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun startImportFlow() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+        }
+        holdLockUntil = System.currentTimeMillis() + HOLD_LOCK_MS
+        try {
+            @Suppress("DEPRECATION")
+            startActivityForResult(intent, REQ_BACKUP_OPEN)
+        } catch (e: Exception) {
+            holdLockUntil = 0L
+            Toast.makeText(this, R.string.vault_no_gallery, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun showJob(titleRes: Int) {
+        jobCancel = false
+        jobLastKey = -1
+        val text = TextView(this)
+        text.setText(R.string.vault_job_prep)
+        text.setTextColor(getColor(R.color.vault_text))
+        text.textSize = 15f
+        val bar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal)
+        bar.max = 1000
+        bar.isIndeterminate = false
+        val box = LinearLayout(this)
+        box.orientation = LinearLayout.VERTICAL
+        box.setPadding(dp(22), dp(10), dp(22), dp(6))
+        box.addView(text)
+        val lp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        lp.topMargin = dp(14)
+        box.addView(bar, lp)
+        val dlg = AlertDialog.Builder(this, R.style.Vault_Dialog)
+            .setTitle(titleRes)
+            .setView(box)
+            .setCancelable(false)
+            .setNegativeButton(R.string.vault_media_cancel, null)
+            .create()
+        dlg.show()
+        dlg.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener { v ->
+            jobCancel = true
+            v.isEnabled = false
+        }
+        jobDialog = dlg
+        jobText = text
+        jobBar = bar
+        // The phone must not fall asleep half way.
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    }
+
+    private fun endJob() {
+        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        try {
+            jobDialog?.dismiss()
+        } catch (e: Exception) {
+        }
+        jobDialog = null
+        jobText = null
+        jobBar = null
+    }
+
+    /** Called from the worker thread; only repaints when the percentage really changed. */
+    private fun jobProgress(stage: Int, done: Long, total: Long, stages: Int) {
+        val frac = if (total > 0) (done.toDouble() / total).coerceIn(0.0, 1.0) else 0.0
+        val pct = (frac * 100).toInt()
+        val overall = when (stage) {
+            VaultBackup.STAGE_WRITE -> frac / stages
+            VaultBackup.STAGE_VERIFY -> 0.5 + frac / stages
+            VaultBackup.STAGE_READ -> frac
+            else -> 0.0
+        }
+        val permille = (overall * 1000).toInt()
+        val key = stage * 10000 + pct
+        if (key == jobLastKey) return
+        jobLastKey = key
+        runOnUiThread {
+            if (isDestroyed) return@runOnUiThread
+            jobBar?.progress = permille
+            jobText?.text = when (stage) {
+                VaultBackup.STAGE_WRITE -> getString(R.string.vault_job_writing, pct)
+                VaultBackup.STAGE_VERIFY -> getString(R.string.vault_job_verifying, pct)
+                VaultBackup.STAGE_READ -> getString(R.string.vault_job_reading, pct)
+                else -> getString(R.string.vault_job_prep)
+            }
+        }
+    }
+
+    private fun showResult(titleRes: Int, message: String) {
+        if (isDestroyed) return
+        AlertDialog.Builder(this, R.style.Vault_Dialog)
+            .setTitle(titleRes)
+            .setMessage(message)
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
+    }
+
+    private fun runBackup(uri: Uri, pw: CharArray) {
+        val app = applicationContext
+        showJob(R.string.vault_job_backup)
+        Thread {
+            var result: VaultBackup.BackupResult? = null
+            var errText: String? = null
+            try {
+                result = VaultBackup.backup(app, uri, pw, { stage, done, total ->
+                    jobProgress(stage, done, total, 2)
+                }, { jobCancel })
+            } catch (e: VaultBackup.BackupError) {
+                errText = getString(
+                    when (e.code) {
+                        VaultBackup.ERR_NO_SPACE -> R.string.vault_backup_err_space
+                        VaultBackup.ERR_CANCELLED -> R.string.vault_backup_err_cancel
+                        VaultBackup.ERR_VERIFY -> R.string.vault_backup_err_verify
+                        VaultBackup.ERR_SOURCE -> R.string.vault_backup_err_source
+                        VaultBackup.ERR_IO -> R.string.vault_backup_err_io
+                        VaultBackup.ERR_EMPTY -> R.string.vault_backup_empty
+                        else -> R.string.vault_backup_err_other
+                    }
+                )
+            } catch (e: Throwable) {
+                errText = getString(R.string.vault_backup_err_other)
+            } finally {
+                pw.fill('\u0000')
+            }
+            runOnUiThread {
+                endJob()
+                if (isDestroyed) return@runOnUiThread
+                renderBackupState()
+                val r = result
+                if (r != null) {
+                    showResult(
+                        R.string.vault_backup_done_title,
+                        getString(R.string.vault_backup_done_msg, r.items, Formatter.formatFileSize(this, r.bytes))
+                    )
+                } else {
+                    showResult(R.string.vault_backup_fail_title, errText ?: getString(R.string.vault_backup_err_other))
+                }
+            }
+        }.start()
+    }
+
+    private fun runImport(uri: Uri, pw: CharArray) {
+        val app = applicationContext
+        showJob(R.string.vault_job_import)
+        Thread {
+            var result: VaultBackup.RestoreResult? = null
+            var errText: String? = null
+            try {
+                result = VaultBackup.restore(app, uri, pw, { stage, done, total ->
+                    jobProgress(stage, done, total, 1)
+                }, { jobCancel })
+            } catch (e: VaultBackup.BackupError) {
+                errText = getString(
+                    when (e.code) {
+                        VaultBackup.ERR_BAD_PASSWORD -> R.string.vault_import_err_pw
+                        VaultBackup.ERR_NO_SPACE -> R.string.vault_import_err_space
+                        VaultBackup.ERR_CANCELLED -> R.string.vault_import_err_cancel
+                        VaultBackup.ERR_IO -> R.string.vault_import_err_io
+                        else -> R.string.vault_import_err_corrupt
+                    }
+                )
+            } catch (e: Throwable) {
+                errText = getString(R.string.vault_import_err_io)
+            } finally {
+                pw.fill('\u0000')
+            }
+            runOnUiThread {
+                endJob()
+                if (isDestroyed) return@runOnUiThread
+                refreshMedia()
+                val r = result
+                if (r != null) {
+                    showResult(R.string.vault_import_done_title, getString(R.string.vault_import_done_msg, r.imported, r.skipped))
+                } else {
+                    showResult(R.string.vault_import_fail_title, errText ?: getString(R.string.vault_import_err_io))
+                }
+            }
+        }.start()
     }
 
     // -- viewer --
@@ -1937,6 +2289,7 @@ class VaultActivity : Activity() {
             return
         }
         decoyPage.visibility = View.GONE
+        MediaVault.clearStaging(this)
         loadAlertTexts()
         loadTileName()
         showPage(Page.HOME)
@@ -2113,6 +2466,7 @@ class VaultActivity : Activity() {
         refreshMedia()
         renderStatus()
         renderDecoyCard()
+        renderBackupState()
         if (currentPage == Page.LOG) renderLog()
         tvUnlockSummary.text = getString(R.string.vault_unlock_summary, Prefs.activeUnlockCount(this), Prefs.METHODS.size)
         updateAlertPreview()
@@ -2534,6 +2888,9 @@ class VaultActivity : Activity() {
         private const val MAX_VOLUME = 6
         private const val REQ_PICK = 41
         private const val REQ_DELETE = 42
+        private const val REQ_BACKUP_SAVE = 43
+        private const val REQ_BACKUP_OPEN = 44
+        private const val SHARE_HOLD_MS = 90 * 1000L
         private const val HOLD_LOCK_MS = 3 * 60 * 1000L
         private const val MIN_CORNER = 4
         private const val MAX_CORNER = 6

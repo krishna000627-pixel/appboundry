@@ -56,6 +56,16 @@ object Prefs {
         prefs(context).edit().putBoolean(KEY_BLOCK_SHOTS, on).apply()
     }
 
+    // ---- Last backup (time and item count only; never the password or the place) ----
+
+    fun lastBackupTime(context: Context): Long = prefs(context).getLong("last_backup_time", 0L)
+
+    fun lastBackupCount(context: Context): Int = prefs(context).getInt("last_backup_count", 0)
+
+    fun setLastBackup(context: Context, time: Long, count: Int) {
+        prefs(context).edit().putLong("last_backup_time", time).putInt("last_backup_count", count).apply()
+    }
+
     // ---- Monitoring ---------------------------------------------------------
 
     fun isEnabled(context: Context): Boolean =
